@@ -12,7 +12,7 @@ DEFAULTS = {
     'db_path': os.path.join(DATA_DIR, 'wikipedia/docs.db'),
     'tfidf_path': os.path.join(
         DATA_DIR,
-        'wikipedia/docs-tfidf-ngram=2-hash=16777216-tokenizer=simple.npz'
+        'wikipedia/tfidf-'
     ),
 }
 

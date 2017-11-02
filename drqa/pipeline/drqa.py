@@ -204,8 +204,10 @@ class DrQA(object):
         # Flatten document ids and retrieve text from database.
         # We remove duplicates for processing efficiency.
         flat_docids = list({d for docids in all_docids for d in docids})
+        logger.info('docids: %s' % flat_docids)
         did2didx = {did: didx for didx, did in enumerate(flat_docids)}
         doc_texts = self.processes.map(fetch_text, flat_docids)
+        logger.info('doc_texts: %s' % doc_texts)
 
         # Split and flatten documents. Maintain a mapping from doc (index in
         # flat list) to split (index in flat list).
@@ -217,12 +219,15 @@ class DrQA(object):
             for split in splits:
                 flat_splits.append(split)
             didx2sidx[-1][1] = len(flat_splits)
+        logger.info('doc_texts: %s' % flat_splits)
 
         # Push through the tokenizers as fast as possible.
         q_tokens = self.processes.map_async(tokenize_text, queries)
         s_tokens = self.processes.map_async(tokenize_text, flat_splits)
         q_tokens = q_tokens.get()
         s_tokens = s_tokens.get()
+        # logger.info('q_tokens: %s' % q_tokens)
+        # logger.info('s_tokens: %s' % s_tokens)
 
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.

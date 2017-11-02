@@ -124,6 +124,9 @@ class Tokens(object):
                 idx += 1
         return groups
 
+    def __repr__(self):
+        return ' '.join(self.words()).strip()
+
 
 class Tokenizer(object):
     """Base tokenizer class.

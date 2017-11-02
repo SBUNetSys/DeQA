@@ -33,7 +33,7 @@ class TfidfDocRanker(object):
         """
         # Load from disk
         tfidf_path = tfidf_path or DEFAULTS['tfidf_path']
-        logger.info('Loading %s' % tfidf_path)
+        # logger.info('Loading %s' % tfidf_path)
         matrix, metadata = utils.load_sparse_csr(tfidf_path)
         self.doc_mat = matrix
         self.ngrams = metadata['ngram']

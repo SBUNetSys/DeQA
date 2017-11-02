@@ -5,12 +5,14 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 """Various retriever utilities."""
-
+import logging
 import regex
 import unicodedata
 import numpy as np
 import scipy.sparse as sp
 from sklearn.utils import murmurhash3_32
+
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------------------
@@ -19,21 +21,32 @@ from sklearn.utils import murmurhash3_32
 
 
 def save_sparse_csr(filename, matrix, metadata=None):
-    data = {
-        'data': matrix.data,
-        'indices': matrix.indices,
-        'indptr': matrix.indptr,
-        'shape': matrix.shape,
-        'metadata': metadata,
-    }
-    np.savez(filename, **data)
+    # data = {
+    #     'data': matrix.data,
+    #     'indices': matrix.indices,
+    #     'indptr': matrix.indptr,
+    #     'shape': matrix.shape,
+    #     'metadata': metadata,
+    # }
+    # np.savez(filename, **data)
+    sp.save_npz(filename + 'matrix', matrix)
+    np.savez(filename + 'meta', meta=metadata)
 
 
 def load_sparse_csr(filename):
-    loader = np.load(filename)
-    matrix = sp.csr_matrix((loader['data'], loader['indices'],
-                            loader['indptr']), shape=loader['shape'])
-    return matrix, loader['metadata'].item(0) if 'metadata' in loader else None
+    # loader = np.load(filename, mmap_mode='r')
+    # matrix = sp.csr_matrix((loader['data'], loader['indices'],
+    #                         loader['indptr']), shape=loader['shape'])
+    # logger.info('metadata size: %f MB' % (loader['metadata'].nbytes / 1024 / 1024))
+    # sp.save_npz('matrix', matrix)
+    # np.savez('meta', meta=loader['metadata'])
+    # return matrix, loader['metadata'].item(0) if 'metadata' in loader else None
+    logger.info('loading matrix: %s' % (filename + '-matrix.npz'))
+    matrix = sp.load_npz(filename + '-matrix.npz')
+    logger.info('matrix size: %f MB' % (matrix.data.nbytes / 1024 / 1024))
+    logger.info('loading metadata: %s' % (filename + '-meta.npz'))
+    metadata = np.load(filename + '-meta.npz')
+    return matrix, metadata['meta'].item(0)
 
 
 # ------------------------------------------------------------------------------
