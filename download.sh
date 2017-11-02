@@ -14,46 +14,49 @@ if [ "$DRQA_DATA" == "" ]; then
     DOWNLOAD_PATH="./data"
 fi
 
-# Get AWS hosted data
-DOWNLOAD_PATH_TAR="$DOWNLOAD_PATH.tar.gz"
+mkdir -p ${DOWNLOAD_PATH}
 
-# Download main hosted data
-wget -O "$DOWNLOAD_PATH_TAR" "https://s3.amazonaws.com/fair-data/drqa/data.tar.gz"
+cd ${DOWNLOAD_PATH}
 
-# Untar
-tar -xvf "$DOWNLOAD_PATH_TAR"
+BASE_URL="https://github.com/csarron/data/releases/download/v0.3"
 
-# Remove tar ball
-rm "$DOWNLOAD_PATH_TAR"
+# get qa data
+QADATA_TARFILE="datasets.tgz"
+echo "Downloading qa dataset..."
+echo
+wget "${BASE_URL}/${QADATA_TARFILE}"
+tar -xvf ${QADATA_TARFILE}
+rm ${QADATA_TARFILE}
 
-# Get externally hosted data
-DATASET_PATH="$DOWNLOAD_PATH/datasets"
+# get reader model
+READER_DIR="reader"
+mkdir -p ${READER_DIR}
+echo "Downloading reader models..."
+echo
+wget -O "${READER_DIR}/multitask.mdl" "${BASE_URL}/multitask.mdl"
+wget -O "${READER_DIR}/single.mdl" "${BASE_URL}/single.mdl"
 
-# Get SQuAD train
-wget -O "$DATASET_PATH/SQuAD-v1.1-train.json" "https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json"
-python scripts/convert/squad.py "$DATASET_PATH/SQuAD-v1.1-train.json" "$DATASET_PATH/SQuAD-v1.1-train.txt"
+# get tfidf data
+WIKI_DIR="wikipedia"
+mkdir -p ${WIKI_DIR}
+echo "Downloading tfidf-matrix data..."
+echo
+wget -O "${WIKI_DIR}/tfidf-matrix.npz.1" "${BASE_URL}/tfidf-matrix.npz.1"
+wget -O "${WIKI_DIR}/tfidf-matrix.npz.2" "${BASE_URL}/tfidf-matrix.npz.2"
+cat "${WIKI_DIR}/tfidf-matrix.npz.*" > "${WIKI_DIR}/tfidf-matrix.npz"
+rm "${WIKI_DIR}/tfidf-matrix.npz.*"
 
-# Get SQuAD dev
-wget -O "$DATASET_PATH/SQuAD-v1.1-dev.json" "https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json"
-python scripts/convert/squad.py "$DATASET_PATH/SQuAD-v1.1-dev.json" "$DATASET_PATH/SQuAD-v1.1-dev.txt"
+echo "Downloading tfidf-meta data..."
+echo
+wget -O "${WIKI_DIR}/tfidf-meta.npz" "${BASE_URL}/tfidf-meta.npz"
 
-# Download official eval for SQuAD
-curl "https://worksheets.codalab.org/rest/bundles/0xbcd57bee090b421c982906709c8c27e1/contents/blob/" >  "./scripts/reader/official_eval.py"
-
-# Get WebQuestions train
-wget -O "$DATASET_PATH/WebQuestions-train.json.bz2" "http://nlp.stanford.edu/static/software/sempre/release-emnlp2013/lib/data/webquestions/dataset_11/webquestions.examples.train.json.bz2"
-bunzip2 -f "$DATASET_PATH/WebQuestions-train.json.bz2"
-python scripts/convert/webquestions.py "$DATASET_PATH/WebQuestions-train.json" "$DATASET_PATH/WebQuestions-train.txt"
-rm "$DATASET_PATH/WebQuestions-train.json"
-
-# Get WebQuestions test
-wget -O "$DATASET_PATH/WebQuestions-test.json.bz2" "http://nlp.stanford.edu/static/software/sempre/release-emnlp2013/lib/data/webquestions/dataset_11/webquestions.examples.test.json.bz2"
-bunzip2 -f "$DATASET_PATH/WebQuestions-test.json.bz2"
-python scripts/convert/webquestions.py "$DATASET_PATH/WebQuestions-test.json" "$DATASET_PATH/WebQuestions-test.txt"
-rm "$DATASET_PATH/WebQuestions-test.json"
-
-# Get freebase entities for WebQuestions
-wget -O "$DATASET_PATH/freebase-entities.txt.gz" "https://s3.amazonaws.com/fair-data/drqa/freebase-entities.txt.gz"
-gzip -d "$DATASET_PATH/freebase-entities.txt.gz"
+# get wikipedia data
+for i in a...g;
+do
+    echo "Downloading docs.db.${i}..."
+    wget -O "${WIKI_DIR}/docs.db.${i}" "${BASE_URL}/docs.db.${i}"
+done
+cat "${WIKI_DIR}/docs.db.*" > "${WIKI_DIR}/docs.db"
+rm "${WIKI_DIR}/docs.db.*"
 
 echo "DrQA download done!"
