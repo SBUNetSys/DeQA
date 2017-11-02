@@ -41,11 +41,11 @@ def load_sparse_csr(filename):
     # sp.save_npz('matrix', matrix)
     # np.savez('meta', meta=loader['metadata'])
     # return matrix, loader['metadata'].item(0) if 'metadata' in loader else None
-    logger.info('loading matrix: %s' % (filename + '-matrix.npz'))
-    matrix = sp.load_npz(filename + '-matrix.npz')
+    logger.info('loading matrix: %s' % (filename + 'matrix.npz'))
+    matrix = sp.load_npz(filename + 'matrix.npz')
     logger.info('matrix size: %f MB' % (matrix.data.nbytes / 1024 / 1024))
-    logger.info('loading metadata: %s' % (filename + '-meta.npz'))
-    metadata = np.load(filename + '-meta.npz')
+    logger.info('loading metadata: %s' % (filename + 'meta.npz'))
+    metadata = np.load(filename + 'meta.npz')
     return matrix, metadata['meta'].item(0)
 
 
