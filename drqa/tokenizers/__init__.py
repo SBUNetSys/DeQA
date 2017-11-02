@@ -8,7 +8,7 @@
 import os
 
 DEFAULTS = {
-    'corenlp_classpath': os.getenv('CLASSPATH')
+    'corenlp_classpath': os.getcwd() + '/data/corenlp/*'
 }
 
 

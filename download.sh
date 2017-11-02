@@ -65,4 +65,14 @@ echo
 cat `ls ${WIKI_DIR}/docs.db.*` > "${WIKI_DIR}/docs.db"
 rm ${WIKI_DIR}/docs.db.*
 
+
+# get corenlp
+CORENLP_TARFILE="corenlp.tgz"
+echo "Downloading corenlp library..."
+echo
+wget "${BASE_URL}/${CORENLP_TARFILE}"
+tar -xvf ${CORENLP_TARFILE}
+rm ${CORENLP_TARFILE}
+echo
+
 echo "DrQA download done!"
