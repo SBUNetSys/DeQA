@@ -54,7 +54,7 @@ echo
 wget -O "${WIKI_DIR}/tfidf-meta.npz" "${BASE_URL}/tfidf-meta.npz"
 
 # get wikipedia data
-for i in a...g;
+for i in {a..g}
 do
     echo "Downloading docs.db.${i}..."
     wget -O "${WIKI_DIR}/docs.db.${i}" "${BASE_URL}/docs.db.${i}"
