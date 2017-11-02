@@ -43,7 +43,7 @@ echo "Downloading tfidf-matrix data..."
 echo
 wget -O "${WIKI_DIR}/tfidf-matrix.npz.1" "${BASE_URL}/tfidf-matrix.npz.1"
 wget -O "${WIKI_DIR}/tfidf-matrix.npz.2" "${BASE_URL}/tfidf-matrix.npz.2"
-cat "${WIKI_DIR}/tfidf-matrix.npz.*" > "${WIKI_DIR}/tfidf-matrix.npz"
+cat `ls ${WIKI_DIR}/tfidf-matrix.npz.*` > "${WIKI_DIR}/tfidf-matrix.npz"
 rm "${WIKI_DIR}/tfidf-matrix.npz.*"
 
 echo "Downloading tfidf-meta data..."
@@ -56,7 +56,7 @@ do
     echo "Downloading docs.db.${i}..."
     wget -O "${WIKI_DIR}/docs.db.${i}" "${BASE_URL}/docs.db.${i}"
 done
-cat "${WIKI_DIR}/docs.db.*" > "${WIKI_DIR}/docs.db"
+cat `ls ${WIKI_DIR}/docs.db.*` > "${WIKI_DIR}/docs.db"
 rm "${WIKI_DIR}/docs.db.*"
 
 echo "DrQA download done!"
