@@ -1,10 +1,4 @@
 #!/bin/bash
-# Copyright 2017-present, Facebook, Inc.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 set -e
 
 # Configure download location
@@ -36,11 +30,19 @@ echo
 wget -O "${READER_DIR}/multitask.mdl" "${BASE_URL}/multitask.mdl"
 wget -O "${READER_DIR}/single.mdl" "${BASE_URL}/single.mdl"
 
+# get corenlp
+CORENLP_TARFILE="corenlp.tgz"
+echo "Downloading corenlp library..."
+echo
+wget "${BASE_URL}/${CORENLP_TARFILE}"
+tar -xvf ${CORENLP_TARFILE}
+rm ${CORENLP_TARFILE}
+echo
+
+# get wikipedia data
 WIKI_DIR="wikipedia"
 mkdir -p ${WIKI_DIR}
 cd ${WIKI_DIR}
-
-# get wikipedia data
 for i in {a..d}
 do
     echo "Downloading wikidata.tar.gz.${i}..."
@@ -52,15 +54,5 @@ echo
 cat `ls wikidata.tar.gz.*` > "wikidata.tar.gz"
 tar -xvf "wikidata.tar.gz"
 rm wikidata.tar.gz*
-
-
-# get corenlp
-CORENLP_TARFILE="corenlp.tgz"
-echo "Downloading corenlp library..."
-echo
-wget "${BASE_URL}/${CORENLP_TARFILE}"
-tar -xvf ${CORENLP_TARFILE}
-rm ${CORENLP_TARFILE}
-echo
 
 echo "DrQA download done!"
