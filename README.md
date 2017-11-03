@@ -10,7 +10,7 @@ This repo keeps track of changes in DrQA for PrIA project.
    
    (1) `git clone https://github.com/csarron/DrQA-pria;`
     
-   (2) `cd DrQA; pip install -r requirements.txt;`
+   (2) `cd DrQA; pip install -r requirements.txt; python setup.py develop`
 
    (3) install PyTorch, see its [website](http://pytorch.org/)
    
