@@ -22,8 +22,8 @@ class GalagoRanker(object):
         """Closest docs by dot product between query and documents
         in tfidf weighted word vector space.
         """
-        args = ['--requested=', k, '--casefold=true', '--query=', '#combine(%s)' % query]
-        results = self._run_galago('batch-search', args)
+        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % query]
+        search_results = self._run_galago('batch-search', args)
         doc_scores = []
         doc_ids = []
 
@@ -34,14 +34,14 @@ class GalagoRanker(object):
         unk-0 Q0 AP892079-4109 4 -4.94346010 galago
         unk-0 Q0 AP891795-0650 5 -4.95236039 galago
         '''
-        for result in results.split('\n'):
+        for result in search_results.split('\n'):
             result_elements = result.split(' ')
             doc_ids.append(result_elements[2])
             doc_scores.append(result_elements[4])
 
         return doc_ids, doc_scores
 
-    def batch_closest_docs(self, queries, k=1, num_workers=None):
+    def batch_closest_docs(self, queries, k=5, num_workers=None):
         """Process a batch of closest_docs requests multithreaded.
         Note: we can use plain threads here as scipy is outside of the GIL.
         """
@@ -61,5 +61,4 @@ class GalagoRanker(object):
         args.extend(arg_list)
         p = subprocess.Popen(args, stdout=subprocess.PIPE)
         out, err = p.communicate()
-        print(out.decode("utf-8").strip())
         return out.decode("utf-8").strip()

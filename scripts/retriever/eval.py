@@ -100,7 +100,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default=None)
     parser.add_argument('--model', type=str, default=None)
-    parser.add_argument('--db', type=str, default='SQL')
+    parser.add_argument('--ranker', type=str, default='tfidf')
     parser.add_argument('--doc-db', type=str, default=None,
                         help='Path to Document DB')
     parser.add_argument('--tokenizer', type=str, default='regexp')
@@ -126,23 +126,24 @@ if __name__ == '__main__':
 
     # get the closest docs for each question.
     logger.info('Initializing ranker...')
-    ranker = retriever.get_class('tfidf')(tfidf_path=args.model)
+
+    if args.ranker == 'Galago':
+        ranker = retriever.get_class('galago')()
+        db_class = retriever.GalagoDB
+        db_opts = {}
+    else:
+        ranker = retriever.get_class('tfidf')(tfidf_path=args.model)
+        db_class = retriever.DocDB
+        db_opts = {'db_path': args.doc_db}
 
     logger.info('Ranking...')
-    closest_docs = ranker.batch_closest_docs(
-        questions, k=args.n_docs, num_workers=args.num_workers
-    )
+    closest_docs = ranker.batch_closest_docs(questions, k=args.n_docs, num_workers=args.num_workers)
     answers_docs = zip(answers, closest_docs)
 
     # define processes
     tok_class = tokenizers.get_class(args.tokenizer)
     tok_opts = {}
-    if args.db == 'Galago':
-        db_class = retriever.GalagoDB
-        db_opts = {'db_path': args.doc_db}
-    else:
-        db_class = retriever.DocDB
-        db_opts = {}
+
     processes = ProcessPool(
         processes=args.num_workers,
         initializer=init,
