@@ -26,7 +26,7 @@ class GalagoDB(object):
         start_pos = doc.find('<TEXT>')
         end_pos = doc.find('</TEXT>')
         text = doc[start_pos: end_pos].strip()
-        print(text)
+        # print(text)
         return text
 
     def close(self):
@@ -43,5 +43,5 @@ class GalagoDB(object):
         args.extend(arg_list)
         p = subprocess.Popen(args, stdout=subprocess.PIPE)
         out, err = p.communicate()
-        print(out.decode("utf-8").strip())
+        # print(out.decode("utf-8").strip())
         return out.decode("utf-8").strip()

@@ -36,9 +36,12 @@ class GalagoRanker(object):
         '''
         for result in search_results.split('\n'):
             result_elements = result.split(' ')
+            if len(result_elements) < 5:
+                print('query failed', query)
+                continue
             doc_ids.append(result_elements[2])
             doc_scores.append(result_elements[4])
-
+        print('query:', query, 'docID:', doc_ids)
         return doc_ids, doc_scores
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):

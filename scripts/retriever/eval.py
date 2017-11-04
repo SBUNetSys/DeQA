@@ -79,7 +79,9 @@ def get_score(answer_doc, match):
     answer, (doc_ids, doc_scores) = answer_doc
     for doc_id in doc_ids:
         if has_answer(answer, doc_id, match):
+            print('answer:', answer, 'docID:', doc_id, 1)
             return 1
+    print('answer:', answer, 'docID:', 0, 0)
     return 0
 
 
