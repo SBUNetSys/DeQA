@@ -100,6 +100,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default=None)
     parser.add_argument('--model', type=str, default=None)
+    parser.add_argument('--db', type=str, default='SQL')
     parser.add_argument('--doc-db', type=str, default=None,
                         help='Path to Document DB')
     parser.add_argument('--tokenizer', type=str, default='regexp')
@@ -136,8 +137,12 @@ if __name__ == '__main__':
     # define processes
     tok_class = tokenizers.get_class(args.tokenizer)
     tok_opts = {}
-    db_class = retriever.DocDB
-    db_opts = {'db_path': args.doc_db}
+    if args.db == 'Galago':
+        db_class = retriever.GalagoDB
+        db_opts = {'db_path': args.doc_db}
+    else:
+        db_class = retriever.DocDB
+        db_opts = {}
     processes = ProcessPool(
         processes=args.num_workers,
         initializer=init,
