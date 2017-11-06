@@ -129,7 +129,7 @@ if __name__ == '__main__':
     # get the closest docs for each question.
     logger.info('Initializing ranker...')
 
-    if args.ranker == 'Galago':
+    if args.ranker.lower().startswith('g'):
         ranker = retriever.get_class('galago')()
         db_class = retriever.GalagoDB
         db_opts = {}
