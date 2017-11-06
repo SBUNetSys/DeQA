@@ -5,7 +5,9 @@ import subprocess
 
 from multiprocessing.pool import ThreadPool
 from functools import partial
+from . import utils
 from . import DEFAULTS
+from .. import tokenizers
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +19,19 @@ class GalagoRanker(object):
     def __init__(self, galago_path=None, index_path=None):
         self.galago_path = galago_path or DEFAULTS['galago_path']
         self.index_path = index_path or DEFAULTS['galago_index']
+        self.tokenizer = tokenizers.get_class('simple')()
+
+    def parse(self, query):
+        """Parse the query into tokens (either ngrams or tokens)."""
+        tokens = self.tokenizer.tokenize(query)
+        return tokens.ngrams(n=2, uncased=True, filter_fn=utils.filter_ngram)
 
     def closest_docs(self, query, k=5):
         """Closest docs by dot product between query and documents
         in tfidf weighted word vector space.
         """
-        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % query]
+        words = self.parse(utils.normalize(query))
+        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % ' '.join(words)]
         search_results = self._run_galago('batch-search', args)
         doc_scores = []
         doc_ids = []
@@ -41,7 +50,7 @@ class GalagoRanker(object):
                 continue
             doc_ids.append(result_elements[2])
             doc_scores.append(result_elements[4])
-        print('query:', query, 'docID:', doc_ids)
+        print('query:', query, 'docID:', doc_ids, 'query words:', words)
         return doc_ids, doc_scores
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):
@@ -64,4 +73,6 @@ class GalagoRanker(object):
         args.extend(arg_list)
         p = subprocess.Popen(args, stdout=subprocess.PIPE)
         out, err = p.communicate()
+        if err:
+            logger.warning(err)
         return out.decode("utf-8").strip()
