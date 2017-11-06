@@ -55,4 +55,17 @@ cat `ls wikidata.tar.gz.*` > "wikidata.tar.gz"
 tar -xvf "wikidata.tar.gz"
 rm wikidata.tar.gz*
 
+# get galago index data
+for i in {a..i}
+do
+    echo "Downloading galago-idx.tar.gz.${i}..."
+    wget -O "galago-idx.tar.gz.${i}" "${BASE_URL}/galago-idx.tar.gz.${i}"
+done
+
+echo "Combining galago-idx.tar.gz data slices into one..."
+echo
+cat `ls galago-idx.tar.gz.*` > "galago-idx.tar.gz"
+tar -xvf "galago-idx.tar.gz"
+rm galago-idx.tar.gz*
+
 echo "DrQA download done!"
