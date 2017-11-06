@@ -8,6 +8,7 @@ from functools import partial
 from . import utils
 from . import DEFAULTS
 from .. import tokenizers
+from .rake import Rake
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,10 @@ class GalagoRanker(object):
     """Use Galago search engine to retrieve wikipedia articles
     """
 
-    def __init__(self, galago_path=None, index_path=None):
+    def __init__(self, galago_path=None, index_path=None, use_keyword=False):
         self.galago_path = galago_path or DEFAULTS['galago_path']
         self.index_path = index_path or DEFAULTS['galago_index']
+        self.use_keyword = use_keyword
         self.tokenizer = tokenizers.get_class('simple')()
 
     def parse(self, query):
@@ -30,8 +32,17 @@ class GalagoRanker(object):
         """Closest docs by dot product between query and documents
         in tfidf weighted word vector space.
         """
-        words = self.parse(utils.normalize(query))
-        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % ' '.join(words)]
+        if self.use_keyword:
+            keyword_items = Rake().run(query)
+            word_queries = []
+            for keyword_item in keyword_items:
+                keyword, _ = keyword_item
+                keyword_query = '#od:1( %s )' % keyword if ' ' in keyword else keyword
+                word_queries.append(keyword_query)
+        else:
+            word_queries = self.parse(utils.normalize(query))
+
+        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % ' '.join(word_queries)]
         search_results = self._run_galago('batch-search', args)
         doc_scores = []
         doc_ids = []
@@ -50,7 +61,7 @@ class GalagoRanker(object):
                 continue
             doc_ids.append(result_elements[2])
             doc_scores.append(result_elements[4])
-        print('query:', query, 'docID:', doc_ids, 'query words:', words)
+        print('query:', query, 'docID:', doc_ids, 'queries :', '#combine(%s)' % ' '.join(word_queries))
         return doc_ids, doc_scores
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):
