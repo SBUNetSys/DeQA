@@ -15,7 +15,8 @@ import logging
 
 from drqa import pipeline
 from drqa.retriever import utils
-
+from drqa.retriever import GalagoRanker
+from drqa.retriever import GalagoDB
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -60,6 +61,8 @@ parser.add_argument('--batch-size', type=int, default=128,
                     help='Document paragraph batching size')
 parser.add_argument('--predict-batch-size', type=int, default=1000,
                     help='Question batching size')
+parser.add_argument('--galago', action='store_true')
+
 args = parser.parse_args()
 t0 = time.time()
 
@@ -81,6 +84,16 @@ if args.candidate_file:
 else:
     candidates = None
 
+if args.galago:
+    ranker_config_dict = {
+        'class': GalagoRanker,
+        'options': {'use_keyword': True}}
+    db_config_dict = {'class': GalagoDB}
+else:
+    ranker_config_dict = {'options': {'tfidf_path': args.retriever_model,
+                                      'strict': False}}
+    db_config_dict = {'options': {'db_path': args.doc_db}}
+
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
     reader_model=args.reader_model,
@@ -90,12 +103,10 @@ DrQA = pipeline.DrQA(
     batch_size=args.batch_size,
     cuda=args.cuda,
     data_parallel=args.parallel,
-    ranker_config={'options': {'tfidf_path': args.retriever_model,
-                               'strict': False}},
-    db_config={'options': {'db_path': args.doc_db}},
+    ranker_config=ranker_config_dict,
+    db_config=db_config_dict,
     num_workers=args.num_workers,
 )
-
 
 # ------------------------------------------------------------------------------
 # Read in dataset and make predictions
