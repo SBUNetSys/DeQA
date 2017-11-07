@@ -76,12 +76,13 @@ def has_answer(answer, doc_id, match):
 
 def get_score(answer_doc, match):
     """Search through all the top docs to see if they have the answer."""
-    answer, (doc_ids, doc_scores) = answer_doc
+    answers_, (doc_ids, doc_scores) = answer_doc
+    answers_ = set(answers_)  # remove duplicates
     for doc_id in doc_ids:
-        if has_answer(answer, doc_id, match):
-            print('answer:', answer, 'docID:', doc_id, 1)
+        if has_answer(answers_, doc_id, match):
+            print('answer:', answers_, 'docID:', doc_id, 1)
             return 1
-    print('answer:', answer, 'docID:', 0, 0)
+    print('answer:', answers_, 'docID:', 0, 0)
     return 0
 
 
