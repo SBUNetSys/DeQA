@@ -106,7 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('--doc-db', type=str, default=None,
                         help='Path to Document DB')
     parser.add_argument('--tokenizer', type=str, default='regexp')
-    parser.add_argument('--use_keyword', action='store_false')
+    parser.add_argument('--use_keyword', action='store_true')
     parser.add_argument('--n-docs', type=int, default=5)
     parser.add_argument('--num-workers', type=int, default=None)
     parser.add_argument('--match', type=str, default='string',
