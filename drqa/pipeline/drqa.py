@@ -111,6 +111,7 @@ class DrQA(object):
         logger.info('Initializing document reader...')
         reader_model = reader_model or DEFAULTS['reader_model']
         self.reader = reader.DocReader.load(reader_model, normalize=False)
+        logger.info('document reader model loaded...')
         if embedding_file:
             logger.info('Expanding dictionary...')
             words = reader.utils.index_embedding_words(embedding_file)
@@ -204,10 +205,10 @@ class DrQA(object):
         # Flatten document ids and retrieve text from database.
         # We remove duplicates for processing efficiency.
         flat_docids = list({d for docids in all_docids for d in docids})
-        # logger.info('docids: %s' % flat_docids)
+        logger.info('top %d docs retrieved...' % n_docs)
         did2didx = {did: didx for didx, did in enumerate(flat_docids)}
         doc_texts = self.processes.map(fetch_text, flat_docids)
-        # logger.info('doc_texts: %s' % doc_texts)
+        logger.info('doc_texts for top %d docs extracted' % n_docs)
 
         # Split and flatten documents. Maintain a mapping from doc (index in
         # flat list) to split (index in flat list).
@@ -219,7 +220,7 @@ class DrQA(object):
             for split in splits:
                 flat_splits.append(split)
             didx2sidx[-1][1] = len(flat_splits)
-        # logger.info('doc_texts: %s' % flat_splits)
+        logger.info('doc_texts flattened')
 
         # Push through the tokenizers as fast as possible.
         q_tokens = self.processes.map_async(tokenize_text, queries)
@@ -228,6 +229,7 @@ class DrQA(object):
         s_tokens = s_tokens.get()
         # logger.info('q_tokens: %s' % q_tokens)
         # logger.info('s_tokens: %s' % s_tokens)
+        logger.info('doc_texts tokenized')
 
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.
@@ -268,6 +270,7 @@ class DrQA(object):
             else:
                 handle = self.reader.predict(batch, async_pool=self.processes)
             result_handles.append((handle, batch[-1], batch[0].size(0)))
+        logger.info('examples predicted...')
 
         # Iterate through the predictions, and maintain priority queues for
         # top scored answers for each question in the batch.
@@ -284,6 +287,7 @@ class DrQA(object):
                     else:
                         heapq.heappushpop(queue, item)
 
+        logger.info('top %d answers processed...' % top_n)
         # Arrange final top prediction data.
         all_predictions = []
         for queue in queues:
