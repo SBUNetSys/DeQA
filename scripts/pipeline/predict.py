@@ -84,7 +84,7 @@ if args.candidate_file:
 else:
     candidates = None
 
-if args.galago:
+if args.no_galago:
     ranker_config_dict = {
         'class': GalagoRanker,
         'options': {'use_keyword': True}}
