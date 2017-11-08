@@ -31,7 +31,10 @@ def evaluate(dataset_file, prediction_file, regex=False):
     with open(prediction_file) as f:
         for line in f:
             data = json.loads(line)
-            prediction = normalize(data[0]['span'])
+            if len(data):
+                prediction = normalize(data[0]['span'])
+            else:
+                prediction = ''
             predictions.append(prediction)
 
     exact_match = 0
@@ -47,8 +50,11 @@ def evaluate(dataset_file, prediction_file, regex=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('dataset', type=str)
-    parser.add_argument('predictions', type=str)
+    # parser.add_argument('--dataset', type=str, default='/Users/qqcao/GitRepos/DrQA-pria/data/datasets/CuratedTrec-test.txt')
+    # parser.add_argument('--predictions', type=str, default='/Users/qqcao/GitRepos/DrQA-pria/data/datasets/mul/CuratedTrec-test.preds.txt')
+    # parser.add_argument('--regex', action='store_false')
+    parser.add_argument('--dataset', type=str, default='/Users/qqcao/GitRepos/DrQA-pria/data/datasets/SQuAD-v1.1-dev.txt')
+    parser.add_argument('--predictions', type=str, default='/Users/qqcao/GitRepos/DrQA-pria/data/datasets/mul/SQuAD-v1.1-dev.preds.txt')
     parser.add_argument('--regex', action='store_true')
     args = parser.parse_args()
     evaluate(args.dataset, args.predictions, args.regex)
