@@ -47,23 +47,28 @@ class GalagoRanker(object):
         search_results = self._run_galago('batch-search', args)
         doc_scores = []
         doc_ids = []
-
-        ''' example results
-        unk-0 Q0 AP890187-3263 1 -4.58285636 galago
-        unk-0 Q0 AP890004-5802 2 -4.73404920 galago
-        unk-0 Q0 AP890058-1371 3 -4.87260425 galago
-        unk-0 Q0 AP892079-4109 4 -4.94346010 galago
-        unk-0 Q0 AP891795-0650 5 -4.95236039 galago
-        '''
-        for result in search_results.split('\n'):
-            result_elements = result.split(' ')
-            if len(result_elements) < 5:
-                print('query failed', query)
+        doc_texts = []
+        for result in search_results.split('</NE>'):
+            if not result:
                 continue
-            doc_ids.append(result_elements[2])
-            doc_scores.append(result_elements[4])
+            result_elements = result.split('<TEXT>')
+            # print(result_elements)
+            meta_info_list = result_elements[0].split()
+            if len(meta_info_list) < 7:
+                print('query failed')
+                continue
+            doc_id = meta_info_list[2]
+            doc_score = meta_info_list[4]
+
+            end_pos = result_elements[1].find('</TEXT>')
+            text = result_elements[1][0: end_pos].strip()
+
+            doc_ids.append(doc_id)
+            doc_scores.append(doc_score)
+            doc_texts.append(text)
+            # print('doc_id:', doc_id, 'doc_text:', text)
         print('query:', query, 'docID:', doc_ids, 'queries :', '#combine(%s)' % ' '.join(word_queries))
-        return doc_ids, doc_scores
+        return doc_ids, doc_scores, doc_texts
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):
         """Process a batch of closest_docs requests multithreaded.

@@ -200,21 +200,21 @@ class DrQA(object):
             ranked = self.ranker.batch_closest_docs(
                 queries, k=n_docs, num_workers=self.num_workers
             )
-        all_docids, all_doc_scores = zip(*ranked)
+        all_docids, all_doc_scores, all_doc_texts = zip(*ranked)
 
         # Flatten document ids and retrieve text from database.
         # We remove duplicates for processing efficiency.
         flat_docids = list({d for docids in all_docids for d in docids})
         logger.info('top %d docs retrieved...' % n_docs)
         did2didx = {did: didx for didx, did in enumerate(flat_docids)}
-        doc_texts = self.processes.map(fetch_text, flat_docids)
-        logger.info('doc_texts for top %d docs extracted' % n_docs)
+        # doc_texts = self.processes.map(fetch_text, flat_docids)
+        # logger.info('doc_texts for top %d docs extracted' % n_docs)
 
         # Split and flatten documents. Maintain a mapping from doc (index in
         # flat list) to split (index in flat list).
         flat_splits = []
         didx2sidx = []
-        for text in doc_texts:
+        for text in all_doc_texts[0]:
             splits = self._split_doc(text)
             didx2sidx.append([len(flat_splits), -1])
             for split in splits:
