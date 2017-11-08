@@ -204,17 +204,20 @@ class DrQA(object):
 
         # Flatten document ids and retrieve text from database.
         # We remove duplicates for processing efficiency.
-        flat_docids = list({d for docids in all_docids for d in docids})
+        flat_docids, flat_doc_texts = zip(* {(d, t) for doc_ids, doc_texts in zip(all_docids, all_doc_texts)
+                                             for d, t in zip(doc_ids, doc_texts)})
+
+        # flat_docids = list({d for docids in all_docids for d in docids})
         logger.info('top %d docs retrieved...' % n_docs)
         did2didx = {did: didx for didx, did in enumerate(flat_docids)}
-        # doc_texts = self.processes.map(fetch_text, flat_docids)
+        # flat_doc_texts = list({t for doc_texts in all_doc_texts for t in doc_texts})
         # logger.info('doc_texts for top %d docs extracted' % n_docs)
 
         # Split and flatten documents. Maintain a mapping from doc (index in
         # flat list) to split (index in flat list).
         flat_splits = []
         didx2sidx = []
-        for text in all_doc_texts[0]:
+        for text in flat_doc_texts:
             splits = self._split_doc(text)
             didx2sidx.append([len(flat_splits), -1])
             for split in splits:
