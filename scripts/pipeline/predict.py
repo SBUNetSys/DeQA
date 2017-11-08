@@ -20,7 +20,7 @@ from drqa.retriever import GalagoDB
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-fmt = logging.Formatter('%(asctime)s: [ %(message)s ]', '%m/%d/%Y %I:%M:%S %p')
+fmt = logging.Formatter('%(asctime)s.%(msecs)d: [ %(message)s ]', '%m/%d/%Y_%H:%M:%S')
 console = logging.StreamHandler()
 console.setFormatter(fmt)
 logger.addHandler(console)
