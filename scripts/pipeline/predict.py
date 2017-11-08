@@ -61,7 +61,7 @@ parser.add_argument('--batch-size', type=int, default=128,
                     help='Document paragraph batching size')
 parser.add_argument('--predict-batch-size', type=int, default=1000,
                     help='Question batching size')
-parser.add_argument('--galago', action='store_false')
+parser.add_argument('--no_galago', action='store_false')
 
 args = parser.parse_args()
 t0 = time.time()
