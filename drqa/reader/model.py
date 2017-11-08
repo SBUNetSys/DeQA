@@ -106,7 +106,7 @@ class DocReader(object):
         with open(embedding_file) as f:
             for line in f:
                 parsed = line.rstrip().split(' ')
-                assert(len(parsed) == embedding.size(1) + 1)
+                assert (len(parsed) == embedding.size(1) + 1)
                 w = self.word_dict.normalize(parsed[0])
                 if w in words:
                     vec = torch.Tensor([float(i) for i in parsed[1:]])
@@ -431,6 +431,9 @@ class DocReader(object):
         feature_dict = saved_params['feature_dict']
         state_dict = saved_params['state_dict']
         args = saved_params['args']
+        args.use_ner = False
+        args.use_pos = False
+        args.use_lemma = False
         if new_args:
             args = override_model_args(args, new_args)
         return DocReader(args, word_dict, feature_dict, state_dict, normalize)
