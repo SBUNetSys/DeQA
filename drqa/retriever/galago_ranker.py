@@ -28,12 +28,12 @@ class GalagoRanker(object):
         tokens = self.tokenizer.tokenize(query)
         return tokens.ngrams(n=2, uncased=True, filter_fn=utils.filter_ngram)
 
-    def closest_docs(self, query, k=5):
+    def closest_docs(self, question, k=5):
         """Closest docs by dot product between query and documents
         in tfidf weighted word vector space.
         """
         if self.use_keyword:
-            keyword_items = Rake().run(query)
+            keyword_items = Rake().run(question)
             word_queries = []
             for keyword_item in keyword_items:
                 keyword, _ = keyword_item
@@ -41,9 +41,10 @@ class GalagoRanker(object):
                 keyword_query = keyword.replace('-', ' ')
                 word_queries.append(keyword_query)
         else:
-            word_queries = self.parse(utils.normalize(query))
+            word_queries = self.parse(utils.normalize(question))
 
-        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % ' '.join(word_queries)]
+        query = ' '.join(word_queries)
+        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % query]
         search_results = self._run_galago('batch-search', args)
         doc_scores = []
         doc_ids = []
@@ -67,7 +68,7 @@ class GalagoRanker(object):
             doc_scores.append(doc_score)
             doc_texts.append(text)
             # print('doc_id:', doc_id, 'doc_text:', text)
-        print('query:', query, 'docID:', doc_ids, 'queries :', '#combine(%s)' % ' '.join(word_queries))
+        logger.info('question:%s, query:%s, doc_ids:%s' % (question, query, ';'.join(doc_ids)))
         return doc_ids, doc_scores, doc_texts
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):
