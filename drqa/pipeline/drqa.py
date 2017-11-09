@@ -113,7 +113,7 @@ class DrQA(object):
         reader_model = reader_model or DEFAULTS['reader_model']
         self.reader = reader.DocReader.load(reader_model, normalize=False)
         t1 = time.time()
-        logger.info('document reader model load [time]: %.4f' % (t1 - t0))
+        logger.info('document reader model load [time]: %.4f s' % (t1 - t0))
 
         logger.info('embedding_file')
         if embedding_file:
@@ -125,6 +125,9 @@ class DrQA(object):
         logger.info('cuda')
         if cuda:
             self.reader.cuda()
+        t2 = time.time()
+        logger.info('cuda initialized [time]: %.4f s' % (t2 - t1))
+
         logger.info('data_parallel')
         if data_parallel:
             self.reader.parallelize()
@@ -144,8 +147,7 @@ class DrQA(object):
         db_class = db_config.get('class', DEFAULTS['db'])
         db_opts = db_config.get('options', {})
 
-        t2 = time.time()
-        logger.info('tokenizers initialized [time]: %.4f' % (t2 - t1))
+        logger.info('ProcessPool')
         self.num_workers = num_workers
         self.processes = ProcessPool(
             num_workers,
@@ -212,7 +214,7 @@ class DrQA(object):
             ranked = self.ranker.batch_closest_docs(queries, k=n_docs, num_workers=self.num_workers)
 
         t4 = time.time()
-        logger.info('docs retrieved [time]:%.4f ' % (t4 - t3))
+        logger.info('docs retrieved [time]: %.4f s' % (t4 - t3))
         all_docids, all_doc_scores, all_doc_texts = zip(*ranked)
 
         # Flatten document ids and retrieve text from database.
@@ -246,7 +248,7 @@ class DrQA(object):
         # logger.info('q_tokens: %s' % q_tokens)
         # logger.info('s_tokens: %s' % s_tokens)
         t6 = time.time()
-        logger.info('doc texts tokenized [time]: %.4f' % (t6 - t5))
+        logger.info('doc texts tokenized [time]: %.4f s' % (t6 - t5))
 
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.
@@ -267,7 +269,7 @@ class DrQA(object):
                             'ner': s_tokens[sidx].entities(),
                         })
         t7 = time.time()
-        logger.info('paragraphs prepared [time]:%.4f' % (t7 - t6))
+        logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
 
         # Push all examples through the document reader.
         # We decode argmax start/end indices asychronously on CPU.
@@ -289,7 +291,7 @@ class DrQA(object):
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 
         t8 = time.time()
-        logger.info('paragraphs predicted [time]:%.4f' % (t8 - t7))
+        logger.info('paragraphs predicted [time]: %.4f s' % (t8 - t7))
 
         # Iterate through the predictions, and maintain priority queues for
         # top scored answers for each question in the batch.
@@ -328,7 +330,7 @@ class DrQA(object):
                 predictions.append(prediction)
             all_predictions.append(predictions[-1::-1])
 
-        logger.info('%d queries processed [time]: %.4f' %
+        logger.info('%d queries processed [time]: %.4f s' %
                     (len(queries), time.time() - t3))
 
         return all_predictions
