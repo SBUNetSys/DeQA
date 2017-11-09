@@ -77,7 +77,7 @@ def has_answer(answer, doc_text, match):
 def get_score(answer_doc, match):
     """Search through all the top docs to see if they have the answer."""
     answers_, (doc_ids, doc_scores, doc_texts) = answer_doc
-    answers_ = set(answers_)  # remove duplicates
+    answers_ = list(set(answers_))  # remove duplicates
     for doc_id, doc_text in zip(doc_ids, doc_texts):
         if has_answer(answers_, doc_text, match):
             print('answer:', answers_, 'docID:', doc_id, 1)

@@ -17,7 +17,7 @@ class GalagoRanker(object):
     """Use Galago search engine to retrieve wikipedia articles
     """
 
-    def __init__(self, galago_path=None, index_path=None, use_keyword=False):
+    def __init__(self, galago_path=None, index_path=None, use_keyword=True):
         self.galago_path = galago_path or DEFAULTS['galago_path']
         self.index_path = index_path or DEFAULTS['galago_index']
         self.use_keyword = use_keyword
