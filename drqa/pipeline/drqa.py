@@ -109,31 +109,43 @@ class DrQA(object):
         self.ranker = ranker_class(**ranker_opts)
 
         logger.info('Initializing document reader...')
+        t0 = time.time()
         reader_model = reader_model or DEFAULTS['reader_model']
         self.reader = reader.DocReader.load(reader_model, normalize=False)
-        logger.info('document reader model loaded...')
+        t1 = time.time()
+        logger.info('document reader model load [time]: %.4f' % (t1 - t0))
+
+        logger.info('embedding_file')
         if embedding_file:
             logger.info('Expanding dictionary...')
             words = reader.utils.index_embedding_words(embedding_file)
             added = self.reader.expand_dictionary(words)
             self.reader.load_embeddings(added, embedding_file)
+
+        logger.info('cuda')
         if cuda:
             self.reader.cuda()
+        logger.info('data_parallel')
         if data_parallel:
             self.reader.parallelize()
 
+        logger.info('tokenizer')
         if not tokenizer:
             tok_class = DEFAULTS['tokenizer']
         else:
             tok_class = tokenizers.get_class(tokenizer)
+
+        logger.info('annotators')
         annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
+        logger.info('db_config')
         db_config = db_config or {}
         db_class = db_config.get('class', DEFAULTS['db'])
         db_opts = db_config.get('options', {})
 
-        logger.info('Initializing tokenizers and document retrievers...')
+        t2 = time.time()
+        logger.info('tokenizers initialized [time]: %.4f' % (t2 - t1))
         self.num_workers = num_workers
         self.processes = ProcessPool(
             num_workers,
@@ -189,7 +201,7 @@ class DrQA(object):
     def process_batch(self, queries, candidates=None, top_n=1, n_docs=5,
                       return_context=False):
         """Run a batch of queries (more efficient)."""
-        t0 = time.time()
+        t3 = time.time()
         logger.info('Processing %d queries...' % len(queries))
         logger.info('Retrieving top %d docs...' % n_docs)
 
@@ -197,9 +209,10 @@ class DrQA(object):
         if len(queries) == 1:
             ranked = [self.ranker.closest_docs(queries[0], k=n_docs)]
         else:
-            ranked = self.ranker.batch_closest_docs(
-                queries, k=n_docs, num_workers=self.num_workers
-            )
+            ranked = self.ranker.batch_closest_docs(queries, k=n_docs, num_workers=self.num_workers)
+
+        t4 = time.time()
+        logger.info('docs retrieved [time]:%.4f ' % (t4 - t3))
         all_docids, all_doc_scores, all_doc_texts = zip(*ranked)
 
         # Flatten document ids and retrieve text from database.
@@ -208,7 +221,6 @@ class DrQA(object):
                                              for d, t in zip(doc_ids, doc_texts)})
 
         # flat_docids = list({d for docids in all_docids for d in docids})
-        logger.info('top %d docs retrieved...' % n_docs)
         did2didx = {did: didx for didx, did in enumerate(flat_docids)}
         # flat_doc_texts = list({t for doc_texts in all_doc_texts for t in doc_texts})
         # logger.info('doc_texts for top %d docs extracted' % n_docs)
@@ -223,6 +235,7 @@ class DrQA(object):
             for split in splits:
                 flat_splits.append(split)
             didx2sidx[-1][1] = len(flat_splits)
+        t5 = time.time()
         logger.info('doc_texts flattened')
 
         # Push through the tokenizers as fast as possible.
@@ -232,7 +245,8 @@ class DrQA(object):
         s_tokens = s_tokens.get()
         # logger.info('q_tokens: %s' % q_tokens)
         # logger.info('s_tokens: %s' % s_tokens)
-        logger.info('doc_texts tokenized')
+        t6 = time.time()
+        logger.info('doc texts tokenized [time]: %.4f' % (t6 - t5))
 
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.
@@ -252,8 +266,8 @@ class DrQA(object):
                             'pos': s_tokens[sidx].pos(),
                             'ner': s_tokens[sidx].entities(),
                         })
-
-        logger.info('Reading %d paragraphs...' % len(examples))
+        t7 = time.time()
+        logger.info('paragraphs prepared [time]:%.4f' % (t7 - t6))
 
         # Push all examples through the document reader.
         # We decode argmax start/end indices asychronously on CPU.
@@ -273,7 +287,9 @@ class DrQA(object):
             else:
                 handle = self.reader.predict(batch, async_pool=self.processes)
             result_handles.append((handle, batch[-1], batch[0].size(0)))
-        logger.info('examples predicted...')
+
+        t8 = time.time()
+        logger.info('paragraphs predicted [time]:%.4f' % (t8 - t7))
 
         # Iterate through the predictions, and maintain priority queues for
         # top scored answers for each question in the batch.
@@ -290,7 +306,7 @@ class DrQA(object):
                     else:
                         heapq.heappushpop(queue, item)
 
-        logger.info('top %d answers processed...' % top_n)
+        logger.info('answers processed...')
         # Arrange final top prediction data.
         all_predictions = []
         for queue in queues:
@@ -312,7 +328,7 @@ class DrQA(object):
                 predictions.append(prediction)
             all_predictions.append(predictions[-1::-1])
 
-        logger.info('Processed %d queries in %.4f (s)' %
-                    (len(queries), time.time() - t0))
+        logger.info('%d queries processed [time]: %.4f' %
+                    (len(queries), time.time() - t3))
 
         return all_predictions
