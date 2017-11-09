@@ -47,15 +47,15 @@ def regex_match(text, pattern):
     return pattern.search(text) is not None
 
 
-def has_answer(answer, doc_id, match):
+def has_answer(answer, doc_text, match):
     """Check if a document contains an answer string.
 
     If `match` is string, token matching is done between the text and answer.
     If `match` is regex, we search the whole text with the regex.
     """
     global PROCESS_DB, PROCESS_TOK
-    text = PROCESS_DB.get_doc_text(doc_id)
-    text = utils.normalize(text)
+    # text = PROCESS_DB.get_doc_text(doc_id)
+    text = utils.normalize(doc_text)
     if match == 'string':
         # Answer is a list of possible strings
         text = PROCESS_TOK.tokenize(text).words(uncased=True)
@@ -76,10 +76,10 @@ def has_answer(answer, doc_id, match):
 
 def get_score(answer_doc, match):
     """Search through all the top docs to see if they have the answer."""
-    answers_, (doc_ids, doc_scores) = answer_doc
+    answers_, (doc_ids, doc_scores, doc_texts) = answer_doc
     answers_ = set(answers_)  # remove duplicates
-    for doc_id in doc_ids:
-        if has_answer(answers_, doc_id, match):
+    for doc_id, doc_text in zip(doc_ids, doc_texts):
+        if has_answer(answers_, doc_text, match):
             print('answer:', answers_, 'docID:', doc_id, 1)
             return 1
     print('answer:', answers_, 'docID:', 0, 0)
