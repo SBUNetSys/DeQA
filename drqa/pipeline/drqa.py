@@ -115,39 +115,39 @@ class DrQA(object):
         t1 = time.time()
         logger.info('document reader model load [time]: %.4f s' % (t1 - t0))
 
-        logger.info('embedding_file')
+        logger.debug('embedding_file')
         if embedding_file:
             logger.info('Expanding dictionary...')
             words = reader.utils.index_embedding_words(embedding_file)
             added = self.reader.expand_dictionary(words)
             self.reader.load_embeddings(added, embedding_file)
 
-        logger.info('cuda')
+        logger.debug('cuda')
         if cuda:
             self.reader.cuda()
         t2 = time.time()
         logger.info('cuda initialized [time]: %.4f s' % (t2 - t1))
 
-        logger.info('data_parallel')
+        logger.debug('data_parallel')
         if data_parallel:
             self.reader.parallelize()
 
-        logger.info('tokenizer')
+        logger.debug('tokenizer')
         if not tokenizer:
             tok_class = DEFAULTS['tokenizer']
         else:
             tok_class = tokenizers.get_class(tokenizer)
 
-        logger.info('annotators')
+        logger.debug('annotators')
         annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
-        logger.info('db_config')
+        logger.debug('db_config')
         db_config = db_config or {}
         db_class = db_config.get('class', DEFAULTS['db'])
         db_opts = db_config.get('options', {})
 
-        logger.info('ProcessPool')
+        logger.debug('ProcessPool')
         self.num_workers = num_workers
         self.processes = ProcessPool(
             num_workers,
@@ -238,7 +238,7 @@ class DrQA(object):
                 flat_splits.append(split)
             didx2sidx[-1][1] = len(flat_splits)
         t5 = time.time()
-        logger.info('doc_texts flattened')
+        logger.debug('doc_texts flattened')
 
         # Push through the tokenizers as fast as possible.
         q_tokens = self.processes.map_async(tokenize_text, queries)

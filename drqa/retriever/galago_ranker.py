@@ -68,7 +68,7 @@ class GalagoRanker(object):
             doc_scores.append(doc_score)
             doc_texts.append(text)
             # print('doc_id:', doc_id, 'doc_text:', text)
-        logger.info('question:%s, query:%s, doc_ids:%s' % (question, query, ';'.join(doc_ids)))
+        logger.debug('question:%s, query:%s, doc_ids:%s' % (question, query, ';'.join(doc_ids)))
         return doc_ids, doc_scores, doc_texts
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):
