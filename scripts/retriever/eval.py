@@ -140,7 +140,7 @@ if __name__ == '__main__':
         db_class = retriever.DocDB
         db_opts = {'db_path': args.doc_db}
 
-    logger.info('Ranking...')
+    logger.info('Ranking and retrieving...')
     closest_docs = ranker.batch_closest_docs(questions, k=args.n_docs, num_workers=args.num_workers)
     answers_docs = zip(answers, closest_docs)
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     )
 
     # compute the scores for each pair, and print the statistics
-    logger.info('Retrieving and computing scores...')
+    logger.info('Computing scores...')
     get_score_partial = partial(get_score, match=args.match)
     scores = processes.map(get_score_partial, answers_docs)
 
