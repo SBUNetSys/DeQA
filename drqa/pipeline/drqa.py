@@ -254,6 +254,8 @@ class DrQA(object):
         # mappings to their question, document, and split ids.
         examples = []
         for qidx in range(len(queries)):
+            para_lens = []
+
             for rel_didx, did in enumerate(all_docids[qidx]):
                 start, end = didx2sidx[did2didx[did]]
                 for sidx in range(start, end):
@@ -268,6 +270,9 @@ class DrQA(object):
                             'pos': s_tokens[sidx].pos(),
                             'ner': s_tokens[sidx].entities(),
                         })
+                        para_lens.append(len(s_tokens[sidx].words()))
+
+            logger.info('question: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
 
