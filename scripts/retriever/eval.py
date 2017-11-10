@@ -135,6 +135,10 @@ if __name__ == '__main__':
         ranker = retriever.get_class('galago')(use_keyword=args.use_keyword)
         db_class = retriever.GalagoDB
         db_opts = {}
+    elif args.ranker.lower().startswith('s'):
+        ranker = retriever.get_class('sql')()
+        db_class = retriever.GalagoDB
+        db_opts = {}
     else:
         ranker = retriever.get_class('tfidf')(tfidf_path=args.model)
         db_class = retriever.DocDB

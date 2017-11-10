@@ -9,6 +9,7 @@ import os
 from .. import DATA_DIR
 
 DEFAULTS = {
+    'sql_path': os.path.join(DATA_DIR, 'wikipedia/wiki_idx.db'),
     'db_path': os.path.join(DATA_DIR, 'wikipedia/docs.db'),
     'tfidf_path': os.path.join(DATA_DIR, 'wikipedia/tfidf-'),
     'galago_path': os.path.join(DATA_DIR, 'galago/bin/galago'),
@@ -26,6 +27,8 @@ def get_class(name):
         return GalagoRanker
     if name == 'tfidf':
         return TfidfDocRanker
+    if name == 'sql':
+        return SqliteRanker
     if name == 'sqlite':
         return DocDB
     raise RuntimeError('Invalid retriever class: %s' % name)
@@ -35,3 +38,4 @@ from .doc_db import DocDB
 from .galago_db import GalagoDB
 from .tfidf_doc_ranker import TfidfDocRanker
 from .galago_ranker import GalagoRanker
+from .sqlite_ranker import SqliteRanker
