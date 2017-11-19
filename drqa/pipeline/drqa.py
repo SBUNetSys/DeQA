@@ -30,22 +30,14 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------
 
 PROCESS_TOK = None
-PROCESS_DB = None
 PROCESS_CANDS = None
 
 
-def init(tokenizer_class, tokenizer_opts, db_class, db_opts, candidates=None):
-    global PROCESS_TOK, PROCESS_DB, PROCESS_CANDS
+def init(tokenizer_class, tokenizer_opts, candidates=None):
+    global PROCESS_TOK, PROCESS_CANDS
     PROCESS_TOK = tokenizer_class(**tokenizer_opts)
     Finalize(PROCESS_TOK, PROCESS_TOK.shutdown, exitpriority=100)
-    PROCESS_DB = db_class(**db_opts)
-    Finalize(PROCESS_DB, PROCESS_DB.close, exitpriority=100)
     PROCESS_CANDS = candidates
-
-
-def fetch_text(doc_id):
-    global PROCESS_DB
-    return PROCESS_DB.get_doc_text(doc_id)
 
 
 def tokenize_text(text):
