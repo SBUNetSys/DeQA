@@ -2,7 +2,7 @@
 
 import logging
 import subprocess
-
+import regex
 from multiprocessing.pool import ThreadPool
 from functools import partial
 from . import utils
@@ -49,7 +49,10 @@ class GalagoRanker(object):
         doc_scores = []
         doc_ids = []
         doc_texts = []
-        for result in search_results.split('</NE>'):
+        for result in search_results.split('</TEXT>'):
+
+            # skip <NE> field
+            result = regex.sub("<NE>([^$]+)</NE>", '', result).strip()
             if not result:
                 continue
             result_elements = result.split('<TEXT>')
@@ -60,9 +63,7 @@ class GalagoRanker(object):
                 continue
             doc_id = meta_info_list[2]
             doc_score = meta_info_list[4]
-
-            end_pos = result_elements[1].find('</TEXT>')
-            text = result_elements[1][0: end_pos].strip()
+            text = result_elements[1].strip()
 
             doc_ids.append(doc_id)
             doc_scores.append(doc_score)
