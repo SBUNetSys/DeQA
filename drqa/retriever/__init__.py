@@ -29,13 +29,9 @@ def get_class(name):
         return TfidfDocRanker
     if name == 'sql':
         return SqliteRanker
-    if name == 'sqlite':
-        return DocDB
     raise RuntimeError('Invalid retriever class: %s' % name)
 
 
-from .doc_db import DocDB
-from .galago_db import GalagoDB
 from .tfidf_doc_ranker import TfidfDocRanker
 from .galago_ranker import GalagoRanker
 from .sqlite_ranker import SqliteRanker

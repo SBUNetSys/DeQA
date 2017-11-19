@@ -24,15 +24,14 @@ from drqa.retriever import utils
 # ------------------------------------------------------------------------------
 
 PROCESS_TOK = None
-PROCESS_DB = None
 
 
-def init(tokenizer_class, tokenizer_opts, db_class, db_opts):
-    global PROCESS_TOK, PROCESS_DB
+def init(tokenizer_class, tokenizer_opts):
+    global PROCESS_TOK
     PROCESS_TOK = tokenizer_class(**tokenizer_opts)
     Finalize(PROCESS_TOK, PROCESS_TOK.shutdown, exitpriority=100)
-    PROCESS_DB = db_class(**db_opts)
-    Finalize(PROCESS_DB, PROCESS_DB.close, exitpriority=100)
+    # PROCESS_DB = db_class(**db_opts)
+    # Finalize(PROCESS_DB, PROCESS_DB.close, exitpriority=100)
 
 
 def regex_match(text, pattern):
@@ -104,8 +103,8 @@ if __name__ == '__main__':
     parser.add_argument('dataset', type=str, default=None)
     parser.add_argument('--model', type=str, default=None)
     parser.add_argument('--ranker', type=str, default='tfidf')
-    parser.add_argument('--doc-db', type=str, default=None,
-                        help='Path to Document DB')
+    parser.add_argument('--db_path', type=str, default=None,
+                        help='Path to Document DB or index')
     parser.add_argument('--tokenizer', type=str, default='regexp')
     parser.add_argument('--use_keyword', action='store_true')
     parser.add_argument('--n-docs', type=int, default=5)
@@ -132,17 +131,11 @@ if __name__ == '__main__':
     logger.info('Initializing ranker...')
 
     if args.ranker.lower().startswith('g'):
-        ranker = retriever.get_class('galago')(use_keyword=args.use_keyword)
-        db_class = retriever.GalagoDB
-        db_opts = {}
+        ranker = retriever.get_class('galago')(use_keyword=args.use_keyword, index_path=args.db_path)
     elif args.ranker.lower().startswith('s'):
-        ranker = retriever.get_class('sql')()
-        db_class = retriever.GalagoDB
-        db_opts = {}
+        ranker = retriever.get_class('sql')(db_path=args.db_path)
     else:
-        ranker = retriever.get_class('tfidf')(tfidf_path=args.model)
-        db_class = retriever.DocDB
-        db_opts = {'db_path': args.doc_db}
+        ranker = retriever.get_class('tfidf')(tfidf_path=args.model, db_path=args.db_path)
 
     logger.info('Ranking and retrieving...')
     closest_docs = ranker.batch_closest_docs(questions, k=args.n_docs, num_workers=args.num_workers)
@@ -152,11 +145,7 @@ if __name__ == '__main__':
     tok_class = tokenizers.get_class(args.tokenizer)
     tok_opts = {}
 
-    processes = ProcessPool(
-        processes=args.num_workers,
-        initializer=init,
-        initargs=(tok_class, tok_opts, db_class, db_opts)
-    )
+    processes = ProcessPool(processes=args.num_workers, initializer=init, initargs=(tok_class, tok_opts))
 
     # compute the scores for each pair, and print the statistics
     logger.info('Computing scores...')

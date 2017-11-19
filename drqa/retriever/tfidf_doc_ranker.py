@@ -16,6 +16,7 @@ from functools import partial
 from . import utils
 from . import DEFAULTS
 from .. import tokenizers
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class TfidfDocRanker(object):
     Scores new queries by taking sparse dot products.
     """
 
-    def __init__(self, tfidf_path=None, strict=True):
+    def __init__(self, tfidf_path=None, strict=True, db_path=None):
         """
         Args:
             tfidf_path: path to saved model file
@@ -43,6 +44,8 @@ class TfidfDocRanker(object):
         self.doc_dict = metadata['doc_dict']
         self.num_docs = len(self.doc_dict[0])
         self.strict = strict
+        self.path = db_path or DEFAULTS['db_path']
+        self.connection = sqlite3.connect(self.path, check_same_thread=False)
 
     def get_doc_index(self, doc_id):
         """Convert doc_id --> doc_index"""
@@ -67,7 +70,8 @@ class TfidfDocRanker(object):
 
         doc_scores = res.data[o_sort]
         doc_ids = [self.get_doc_id(i) for i in res.indices[o_sort]]
-        return doc_ids, doc_scores
+        doc_texts = [self.get_doc_text(i) for i in doc_ids]
+        return doc_ids, doc_scores, doc_texts
 
     def batch_closest_docs(self, queries, k=1, num_workers=None):
         """Process a batch of closest_docs requests multithreaded.
@@ -119,3 +123,36 @@ class TfidfDocRanker(object):
         )
 
         return spvec
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def path(self):
+        """Return the path to the file that backs this database."""
+        return self.path
+
+    def close(self):
+        """Close the connection to the database."""
+        self.connection.close()
+
+    def get_doc_ids(self):
+        """Fetch all ids of docs stored in the db."""
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT id FROM documents")
+        results = [r[0] for r in cursor.fetchall()]
+        cursor.close()
+        return results
+
+    def get_doc_text(self, doc_id):
+        """Fetch the raw text of the doc for 'doc_id'."""
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT text FROM documents WHERE id = ?",
+            (utils.normalize(doc_id),)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        return result if result is None else result[0]
