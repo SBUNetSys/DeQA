@@ -4,9 +4,9 @@ import subprocess
 import regex
 
 # ../../data/wikipedia/galago-idx
-p = subprocess.Popen(['../../data/galago/bin/galago', 'batch-search', '--index=',
-                      '/Volumes/HDD/enwiki-idx-20171103', '--requested=', '5', '--casefold=true',
-                      '--query=', '#combine(Anarchism)'], stdout=subprocess.PIPE)
+p = subprocess.Popen(['data/galago/bin/galago', 'batch-search', '--index=',
+                      'data/wikipedia/galago-idx', '--requested=', '5', '--casefold=true',
+                      '--query=', '#combine(allen iverson tall)'], stdout=subprocess.PIPE)
 out, err = p.communicate()
 print(out.decode("utf-8").strip())
 
