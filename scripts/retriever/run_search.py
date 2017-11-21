@@ -4,8 +4,8 @@ import subprocess
 import regex
 
 # ../../data/wikipedia/galago-idx
-p = subprocess.Popen(['data/galago/bin/galago', 'batch-search', '--index=',
-                      'data/wikipedia/galago-idx', '--requested=', '5', '--casefold=true',
+p = subprocess.Popen(['/Users/qqcao/GitRepos/DrQA-pria/data/galago/bin/galago', 'batch-search', '--index=',
+                      '/Users/qqcao/GitRepos/DrQA-pria/data/wikipedia/galago-idx', '--requested=', '5', '--casefold=true',
                       '--query=', '#combine(allen iverson tall)'], stdout=subprocess.PIPE)
 out, err = p.communicate()
 print(out.decode("utf-8").strip())
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     for result in out.decode("utf-8").strip().split('</TEXT>'):
 
         # skip <NE> field
-        result = regex.sub("<NE>([^$]+)</NE>", '', result).strip()
+        result = regex.sub("(?s)(<NE>)(.*?)(</NE>)", '', result.strip()).strip()
         if not result:
             continue
 

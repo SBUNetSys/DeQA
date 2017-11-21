@@ -52,7 +52,7 @@ class GalagoRanker(object):
         for result in search_results.split('</TEXT>'):
 
             # skip <NE> field
-            result = regex.sub("<NE>([^$]+)</NE>", '', result).strip()
+            result = regex.sub("(?s)(<NE>)(.*?)(</NE>)", '', result.strip()).strip()
             if not result:
                 continue
             result_elements = result.split('<TEXT>')
