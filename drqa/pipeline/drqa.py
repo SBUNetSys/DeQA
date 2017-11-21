@@ -67,7 +67,6 @@ class DrQA(object):
             data_parallel=False,
             max_loaders=5,
             num_workers=None,
-            db_config=None,
             ranker_config=None
     ):
         """Initialize the pipeline.
@@ -134,17 +133,12 @@ class DrQA(object):
         annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
-        logger.debug('db_config')
-        db_config = db_config or {}
-        db_class = db_config.get('class', DEFAULTS['db'])
-        db_opts = db_config.get('options', {})
-
         logger.debug('ProcessPool')
         self.num_workers = num_workers
         self.processes = ProcessPool(
             num_workers,
             initializer=init,
-            initargs=(tok_class, tok_opts, db_class, db_opts, fixed_candidates)
+            initargs=(tok_class, tok_opts, fixed_candidates)
         )
 
     def _split_doc(self, doc):

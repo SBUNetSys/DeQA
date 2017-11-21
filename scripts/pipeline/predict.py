@@ -16,7 +16,6 @@ import logging
 from drqa import pipeline
 from drqa.retriever import utils
 from drqa.retriever import GalagoRanker
-from drqa.retriever import GalagoDB
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -34,8 +33,8 @@ parser.add_argument('--reader-model', type=str, default=None,
                     help="Path to trained Document Reader model")
 parser.add_argument('--retriever-model', type=str, default=None,
                     help="Path to Document Retriever model (tfidf)")
-parser.add_argument('--doc-db', type=str, default=None,
-                    help='Path to Document DB')
+parser.add_argument('--db_path', type=str, default=None,
+                    help='Path to Document DB or index')
 parser.add_argument('--embedding-file', type=str, default=None,
                     help=("Expand dictionary to use all pretrained "
                           "embeddings in this file"))
@@ -51,7 +50,7 @@ parser.add_argument('--tokenizer', type=str, default='simple',
                           "(e.g. 'corenlp')"))
 parser.add_argument('--no-cuda', action='store_true',
                     help="Use CPU only")
-parser.add_argument('--gpu', type=int, default=-1,
+parser.add_argument('--gpu', type=int, default=0,
                     help="Specify GPU device id to use")
 parser.add_argument('--parallel', action='store_true',
                     help='Use data parallel (split across gpus)')
@@ -73,6 +72,9 @@ if args.cuda:
 else:
     logger.info('Running on CPU only.')
 
+if not os.path.exists(args.out_dir):
+    os.makedirs(args.out_dir)
+
 if args.candidate_file:
     logger.info('Loading candidates from %s' % args.candidate_file)
     candidates = set()
@@ -87,12 +89,12 @@ else:
 if args.no_galago:
     ranker_config_dict = {
         'class': GalagoRanker,
-        'options': {'use_keyword': True}}
-    db_config_dict = {'class': GalagoDB}
+        'options': {'use_keyword': True,
+                    'index_path': args.db_path
+                    }}
 else:
     ranker_config_dict = {'options': {'tfidf_path': args.retriever_model,
                                       'strict': False}}
-    db_config_dict = {'options': {'db_path': args.doc_db}}
 
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
@@ -104,7 +106,6 @@ DrQA = pipeline.DrQA(
     cuda=args.cuda,
     data_parallel=args.parallel,
     ranker_config=ranker_config_dict,
-    db_config=db_config_dict,
     num_workers=args.num_workers,
 )
 
