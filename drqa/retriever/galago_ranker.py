@@ -69,7 +69,7 @@ class GalagoRanker(object):
             doc_scores.append(doc_score)
             doc_texts.append(text)
             # print('doc_id:', doc_id, 'doc_text:', text)
-        logger.debug('question:%s, query:%s, doc_ids:%s doc_scores:%s'
+        logger.debug('question_d:%s, query:%s, doc_ids:%s doc_scores:%s'
                      % (question, query, ';'.join(doc_ids), ';'.join(doc_scores)))
         return doc_ids, doc_scores, doc_texts
 

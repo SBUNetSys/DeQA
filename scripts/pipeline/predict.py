@@ -61,8 +61,13 @@ parser.add_argument('--batch-size', type=int, default=128,
 parser.add_argument('--predict-batch-size', type=int, default=1000,
                     help='Question batching size')
 parser.add_argument('--no_galago', action='store_false')
+parser.add_argument("-v", "--verbose", help="log more debug info",
+                    action="store_true")
 
 args = parser.parse_args()
+if args.verbose:
+    logger.setLevel(logging.DEBUG)
+
 t0 = time.time()
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()

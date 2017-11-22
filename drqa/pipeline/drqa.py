@@ -258,7 +258,7 @@ class DrQA(object):
                         })
                         para_lens.append(len(s_tokens[sidx].words()))
 
-            logger.info('question: %s paragraphs: %s' % (queries[qidx], para_lens))
+            logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
 
