@@ -19,13 +19,22 @@ if __name__ == '__main__':
     total_time = []
 
     for line in extract_lines(args.log_file, 'docs retrieved [time]: ', ' s ]'):
-        retrieval_time.append(line)
+        retrieval_time.append(float(line))
 
     for line in extract_lines(args.log_file, 'paragraphs predicted [time]: ', ' s ]'):
-        prediction_time.append(line)
+        prediction_time.append(float(line))
 
     for line in extract_lines(args.log_file, 'queries processed [time]: ', ' s ]'):
-        total_time.append(line)
+        total_time.append(float(line))
 
-    for r, p, t in zip(retrieval_time, prediction_time, total_time):
-        print(r, p, t, '%.4f %%' % (float(p)/float(t)*100))
+    # for r, p, t in zip(retrieval_time, prediction_time, total_time):
+    #     print(r, p, t, '%.4f %%' % (p / t * 100))
+
+    ret_time_avg = sum(retrieval_time) / len(retrieval_time)
+    pred_time_avg = sum(prediction_time) / len(prediction_time)
+    total_time_avg = sum(total_time) / len(total_time)
+    print('avg:')
+    print('%.4f' % ret_time_avg)
+    print('%.4f' % pred_time_avg)
+    print('%.4f' % total_time_avg)
+    print('%.4f' % (pred_time_avg / total_time_avg))
