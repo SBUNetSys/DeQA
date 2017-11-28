@@ -106,21 +106,21 @@ class DrQA(object):
         t1 = time.time()
         logger.info('document reader model load [time]: %.4f s' % (t1 - t0))
 
-        logger.debug('embedding_file')
         if embedding_file:
+            logger.info('embedding_file')
             logger.info('Expanding dictionary...')
             words = reader.utils.index_embedding_words(embedding_file)
             added = self.reader.expand_dictionary(words)
             self.reader.load_embeddings(added, embedding_file)
 
-        logger.debug('cuda')
         if cuda:
+            logger.info('cuda')
             self.reader.cuda()
         t2 = time.time()
         logger.info('cuda initialized [time]: %.4f s' % (t2 - t1))
 
-        logger.debug('data_parallel')
         if data_parallel:
+            logger.info('data_parallel')
             self.reader.parallelize()
 
         logger.debug('tokenizer')
@@ -133,7 +133,6 @@ class DrQA(object):
         annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
-        logger.debug('ProcessPool')
         self.num_workers = num_workers
         self.processes = ProcessPool(
             num_workers,
