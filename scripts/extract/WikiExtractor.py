@@ -566,21 +566,42 @@ class Extractor(object):
         """
         url = get_url(self.id)
         if options.write_json:
-            json_data = {
-                'id': self.id,
-                'url': url,
-                'title': self.title,
-                'text': "\n".join(text)
-            }
-            if options.print_revision:
-                json_data['revid'] = self.revid
-            # We don't use json.dump(data, out) because we want to be
-            # able to encode the string if the output is sys.stdout
-            out_str = json.dumps(json_data, ensure_ascii=False)
-            if out == sys.stdout:  # option -a or -o -
-                out_str = out_str.encode('utf-8')
-            out.write(out_str)
-            out.write('\n')
+            # json_data = {
+            #     'id': self.id,
+            #     'url': url,
+            #     'title': self.title,
+            #     'text': "\n".join(text)
+            # }
+            # if options.print_revision:
+            #     json_data['revid'] = self.revid
+            # # We don't use json.dump(data, out) because we want to be
+            # # able to encode the string if the output is sys.stdout
+            # out_str = json.dumps(json_data, ensure_ascii=False)
+            # if out == sys.stdout:  # option -a or -o -
+            #     out_str = out_str.encode('utf-8')
+            # out.write(out_str)
+            # out.write('\n')
+            seq = 1
+            for line in text:
+                if not line:
+                    continue
+                json_data = {
+                    'id': '{}_{}'.format(self.id, seq),
+                    'url': url,
+                    'title': self.title,
+                    'text': line
+                }
+                if options.print_revision:
+                    json_data['revid'] = self.revid
+                # We don't use json.dump(data, out) because we want to be
+                # able to encode the string if the output is sys.stdout
+                out_str = json.dumps(json_data, ensure_ascii=False)
+                if out == sys.stdout:  # option -a or -o -
+                    out_str = out_str.encode('utf-8')
+                out.write(out_str)
+                out.write('\n')
+                seq += 1
+
         else:
             # if options.print_revision:
             #     header = '<doc id="%s" revid="%s" url="%s" title="%s">\n' % (self.id, self.revid, url, self.title)
@@ -609,7 +630,6 @@ class Extractor(object):
                 out.write(line)
                 out.write(footer)
                 seq += 1
-
 
     def extract(self, out):
         """
