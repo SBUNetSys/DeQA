@@ -10,8 +10,6 @@ import torch
 import regex
 import heapq
 import math
-import time
-import logging
 
 from multiprocessing import Pool as ProcessPool
 from multiprocessing.util import Finalize
@@ -21,7 +19,8 @@ from ..reader.data import ReaderDataset, SortedBatchSampler
 from .. import reader
 from .. import tokenizers
 from . import DEFAULTS
-
+import logging
+import time
 logger = logging.getLogger(__name__)
 
 
