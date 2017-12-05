@@ -10,13 +10,13 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
-import logging
 import copy
 
 from torch.autograd import Variable
 from .config import override_model_args
 from .rnn_reader import RnnDocReader
-
+import logging
+import time
 logger = logging.getLogger(__name__)
 
 
@@ -316,6 +316,7 @@ class DocReader(object):
         pred_e = []
         pred_score = []
         max_len = max_len or score_s.size(1)
+        t1 = time.time()
         for i in range(score_s.size(0)):
             # Outer product of scores to get full p_s * p_e matrix
             scores = torch.ger(score_s[i], score_e[i])
@@ -337,6 +338,8 @@ class DocReader(object):
             pred_s.append(s_idx)
             pred_e.append(e_idx)
             pred_score.append(scores_flat[idx_sort])
+        t2 = time.time()
+        logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
         return pred_s, pred_e, pred_score
 
     @staticmethod
