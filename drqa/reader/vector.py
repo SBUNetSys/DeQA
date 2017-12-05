@@ -8,10 +8,15 @@
 
 from collections import Counter
 import torch
+import logging
+import time
+logger = logging.getLogger(__name__)
 
 
 def vectorize(ex, model, single_answer=False):
     """Torchify a single example."""
+    t1 = time.time()
+
     args = model.args
     word_dict = model.word_dict
     feature_dict = model.feature_dict
@@ -60,6 +65,8 @@ def vectorize(ex, model, single_answer=False):
         for i, w in enumerate(ex['document']):
             features[i][feature_dict['tf']] = counter[w.lower()] * 1.0 / l
 
+    t2 = time.time()
+    logger.debug('vectorize [time]: %.4f s' % (t2 - t1))
     # Maybe return without target
     if 'answers' not in ex:
         return document, features, question, ex['id']
@@ -81,6 +88,7 @@ def batchify(batch):
     NUM_INPUTS = 3
     NUM_TARGETS = 2
     NUM_EXTRA = 1
+    t1 = time.time()
 
     ids = [ex[-1] for ex in batch]
     docs = [ex[0] for ex in batch]
@@ -109,6 +117,8 @@ def batchify(batch):
         x2[i, :q.size(0)].copy_(q)
         x2_mask[i, :q.size(0)].fill_(0)
 
+    t2 = time.time()
+    logger.debug('batchify [time]: %.4f s' % (t2 - t1))
     # Maybe return without targets
     if len(batch[0]) == NUM_INPUTS + NUM_EXTRA:
         return x1, x1_f, x1_mask, x2, x2_mask, ids

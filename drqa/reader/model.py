@@ -272,8 +272,8 @@ class DocReader(object):
         If async_pool is given, these will be AsyncResult handles.
         """
         # Eval mode
+        t1 = time.time()
         self.network.eval()
-
         # Transfer to GPU
         if self.use_cuda:
             inputs = [e if e is None else
@@ -282,7 +282,8 @@ class DocReader(object):
         else:
             inputs = [e if e is None else Variable(e, volatile=True)
                       for e in ex[:5]]
-
+        t2 = time.time()
+        logger.debug('input processing [time]: %.4f s' % (t2 - t1))
         # Run forward
         score_s, score_e = self.network(*inputs)
 
@@ -434,6 +435,7 @@ class DocReader(object):
         feature_dict = saved_params['feature_dict']
         state_dict = saved_params['state_dict']
         args = saved_params['args']
+        args.use_lemma = False
         args.use_ner = False
         args.use_pos = False
         args.use_tf = False
