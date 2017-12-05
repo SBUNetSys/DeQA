@@ -14,7 +14,8 @@ if __name__ == '__main__':
     # time_flags = ['docs retrieved', 'paragraphs predicted', 'queries processed']
     time_flags = ['docs retrieved', 'paragraphs predicted', 'queries processed',
                   'embedding lookup', 'weighted question attention emb', 'doc_rnn',
-                  'question_rnn', 'question_self_attn', 'question_weighted_avg', 'start_attn', 'end_attn']
+                  'question_rnn', 'question_self_attn', 'question_weighted_avg',
+                  'start_attn', 'end_attn', 'answer decoding']
 
     stage_times = [list() for _ in time_flags]
 
