@@ -436,7 +436,6 @@ class DocReader(object):
         args = saved_params['args']
         args.use_ner = False
         args.use_pos = False
-        args.use_lemma = False
         args.use_tf = False
         if new_args:
             args = override_model_args(args, new_args)
