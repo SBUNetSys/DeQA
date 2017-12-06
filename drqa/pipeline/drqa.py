@@ -84,7 +84,6 @@ class DrQA(object):
               (default is fine).
             num_workers: number of parallel CPU processes to use for tokenizing
               and post processing resuls.
-            db_config: config for doc db.
             ranker_config: config for ranker.
         """
         self.batch_size = batch_size

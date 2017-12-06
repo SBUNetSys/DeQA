@@ -15,6 +15,7 @@ import logging
 from termcolor import colored
 from drqa import pipeline
 from drqa.retriever import utils
+from drqa.retriever import GalagoRanker
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -40,6 +41,10 @@ parser.add_argument('--no-cuda', action='store_true',
                     help="Use CPU only")
 parser.add_argument('--gpu', type=int, default=-1,
                     help="Specify GPU device id to use")
+parser.add_argument('--galago', action='store_true')
+parser.add_argument('--db_path', type=str, default=None,
+                    help='Path to Document DB or index')
+
 args = parser.parse_args()
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -60,13 +65,19 @@ if args.candidate_file:
 else:
     candidates = None
 
+if args.galago:
+    ranker_config_dict = {
+        'class': GalagoRanker,
+        'options': {'use_keyword': True, 'index_path': args.db_path}}
+else:
+    ranker_config_dict = {'options': {'tfidf_path': args.retriever_model}}
+
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
     cuda=args.cuda,
     fixed_candidates=candidates,
     reader_model=args.reader_model,
-    ranker_config={'options': {'tfidf_path': args.retriever_model}},
-    db_config={'options': {'db_path': args.doc_db}},
+    ranker_config=ranker_config_dict,
     tokenizer=args.tokenizer
 )
 
