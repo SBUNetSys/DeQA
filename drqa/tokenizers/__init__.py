@@ -6,9 +6,10 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
+from .. import DATA_DIR
 
 DEFAULTS = {
-    'corenlp_classpath': os.getcwd() + '/data/corenlp/*'
+    'corenlp_classpath': os.path.join(DATA_DIR, 'corenlp/*')
 }
 
 
