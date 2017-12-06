@@ -117,7 +117,7 @@ class Tokens(object):
             if ner_tag != non_ent:
                 # Chomp the sequence
                 start = idx
-                while (idx < len(entities) and entities[idx] == ner_tag):
+                while idx < len(entities) and entities[idx] == ner_tag:
                     idx += 1
                 groups.append((self.slice(start, idx).untokenize(), ner_tag))
             else:
