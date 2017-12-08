@@ -41,7 +41,7 @@ def vectorize(ex, model, single_answer=False):
                 features[i][feature_dict['in_question']] = 1.0
             if ex['document'][i].lower() in q_words_uncased:
                 features[i][feature_dict['in_question_uncased']] = 1.0
-            if q_lemma and ex['lemma'][i] in q_lemma:
+            if q_lemma and 'in_question_lemma' in feature_dict and ex['lemma'][i] in q_lemma:
                 features[i][feature_dict['in_question_lemma']] = 1.0
 
     # f_{token} (POS)
