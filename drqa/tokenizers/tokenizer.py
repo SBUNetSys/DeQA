@@ -8,6 +8,14 @@
 
 import copy
 
+NER = ['PERSON', 'NUMBER', 'DATE', 'DURATION', 'MISC', 'TIME',
+       'LOCATION', 'ORDINAL', 'MONEY', 'ORGANIZATION', 'SET', 'O']
+
+POS = ['CC', 'CD', 'DT', 'EX', 'FW', 'IN', 'JJ', 'JJR', 'JJS', 'LS',
+       'MD', 'NN', 'NNS', 'NNP', 'NNPS', 'PDT', 'POS', 'PRP', 'PRP$',
+       'RB', 'RBR', 'RBS', 'RP', 'SYM', 'TO', 'UH', 'VB', 'VBD', 'VBG',
+       'VBN', 'VBP', 'VBZ', 'WDT', 'WP', 'WP$', 'WRB']
+
 
 class Tokens(object):
     """A class to represent a list of tokenized text."""
@@ -60,6 +68,9 @@ class Tokens(object):
             return None
         return [t[self.POS] for t in self.data]
 
+    def v_pos(self):
+        return [POS.index(p) if p in POS else 100 for p in self.pos()]
+
     def lemmas(self):
         """Returns a list of the lemmatized text of each token.
         Returns None if this annotation was not included.
@@ -76,6 +87,9 @@ class Tokens(object):
             return None
         return [t[self.NER] for t in self.data]
 
+    def v_ner(self):
+        return [NER.index(n) if n in NER else 100 for n in self.entities()]
+
     def ngrams(self, n=1, uncased=False, filter_fn=None, as_strings=True):
         """Returns a list of all ngrams from length 1 to n.
 
@@ -84,7 +98,7 @@ class Tokens(object):
             uncased: lower cases text
             filter_fn: user function that takes in an ngram list and returns
               True or False to keep or not keep the ngram
-            as_string: return the ngram as a string vs list
+            as_strings: return the ngram as a string vs list
         """
         def _skip(gram):
             if not filter_fn:
