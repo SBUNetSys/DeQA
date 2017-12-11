@@ -8,14 +8,6 @@
 
 import copy
 
-NER = ['PERSON', 'NUMBER', 'DATE', 'DURATION', 'MISC', 'TIME',
-       'LOCATION', 'ORDINAL', 'MONEY', 'ORGANIZATION', 'SET', 'O']
-
-POS = ['CC', 'CD', 'DT', 'EX', 'FW', 'IN', 'JJ', 'JJR', 'JJS', 'LS',
-       'MD', 'NN', 'NNS', 'NNP', 'NNPS', 'PDT', 'POS', 'PRP', 'PRP$',
-       'RB', 'RBR', 'RBS', 'RP', 'SYM', 'TO', 'UH', 'VB', 'VBD', 'VBG',
-       'VBN', 'VBP', 'VBZ', 'WDT', 'WP', 'WP$', 'WRB']
-
 
 class Tokens(object):
     """A class to represent a list of tokenized text."""
@@ -68,9 +60,6 @@ class Tokens(object):
             return None
         return [t[self.POS] for t in self.data]
 
-    def v_pos(self):
-        return [POS.index(p) if p in POS else 100 for p in self.pos()]
-
     def lemmas(self):
         """Returns a list of the lemmatized text of each token.
         Returns None if this annotation was not included.
@@ -86,9 +75,6 @@ class Tokens(object):
         if 'ner' not in self.annotators:
             return None
         return [t[self.NER] for t in self.data]
-
-    def v_ner(self):
-        return [NER.index(n) if n in NER else 100 for n in self.entities()]
 
     def ngrams(self, n=1, uncased=False, filter_fn=None, as_strings=True):
         """Returns a list of all ngrams from length 1 to n.
@@ -146,6 +132,15 @@ class Tokenizer(object):
     """Base tokenizer class.
     Tokenizers implement tokenize, which should return a Tokens class.
     """
+
+    NER = ['O', 'MISC', 'PERSON', 'LOCATION', 'DATE', 'NUMBER', 'ORGANIZATION',
+           'SET', 'DURATION', 'ORDINAL', 'PERCENT', 'MONEY', 'TIME', ]
+
+    POS = ['RB', ',', 'DT', 'NN', 'VBZ', 'JJ', '.', 'IN', 'NNP', 'POS', 'CC', 'VBG',
+           'PRP', 'NNS', 'VBN', '``', 'NNPS', "''", 'TO', 'WRB', 'VBD', 'CD', '-LRB-',
+           'WDT', '-RRB-', 'RBS', 'VBP', 'VB', 'JJS', ':', 'PRP$', 'WP', 'JJR', '$', 'RP',
+           'MD', 'EX', '#', 'RBR', 'FW', 'WP$', 'UH', 'PDT', 'SYM', 'LS']
+
     def tokenize(self, text):
         raise NotImplementedError
 

@@ -10,7 +10,9 @@ import torch
 import regex
 import heapq
 import math
-
+import json
+from collections import Counter
+import os
 from multiprocessing import Pool as ProcessPool
 from multiprocessing.util import Finalize
 
@@ -21,8 +23,8 @@ from .. import tokenizers
 from . import DEFAULTS
 import logging
 import time
+from ..tokenizers.tokenizer import Tokenizer
 logger = logging.getLogger(__name__)
-
 
 # ------------------------------------------------------------------------------
 # Multiprocessing functions to fetch and tokenize text
@@ -90,6 +92,10 @@ class DrQA(object):
         self.max_loaders = max_loaders
         self.fixed_candidates = fixed_candidates is not None
         self.cuda = cuda
+
+        feat_dir = DEFAULTS['features']
+        if not os.path.exists(feat_dir):
+            os.makedirs(feat_dir)
 
         logger.info('Initializing document ranker...')
         ranker_config = ranker_config or {}
@@ -202,8 +208,8 @@ class DrQA(object):
 
         # Flatten document ids and retrieve text from database.
         # We remove duplicates for processing efficiency.
-        flat_docids, flat_doc_texts = zip(* {(d, t) for doc_ids, doc_texts in zip(all_docids, all_doc_texts)
-                                             for d, t in zip(doc_ids, doc_texts)})
+        flat_docids, flat_doc_texts = zip(*{(d, t) for doc_ids, doc_texts in zip(all_docids, all_doc_texts)
+                                            for d, t in zip(doc_ids, doc_texts)})
 
         # flat_docids = list({d for docids in all_docids for d in docids})
         did2didx = {did: didx for didx, did in enumerate(flat_docids)}
@@ -276,6 +282,33 @@ class DrQA(object):
                 )
             else:
                 handle = self.reader.predict(batch, async_pool=self.processes)
+
+            (qidx, rel_didx, sidx) = batch[-1][0]
+            doc_id = all_docids[qidx][rel_didx]
+            feat_file = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
+
+            if not os.path.exists(feat_file):
+                s, e, ans_score = handle.get()
+                doc_score = float(all_doc_scores[qidx][rel_didx])
+                para_text = s_tokens[sidx].words(True)
+                para_length = len(para_text)
+                counter = Counter(para_text)
+                term_frequencies = [counter[w] * 1.0 / para_length for w in para_text]
+                # ner = [1 if n in Tokenizer.NER else 0 for n in s_tokens[sidx].entities()]
+
+                record = {
+                    's_p': float(doc_score),
+                    's_a': float(ans_score[0][0]),
+                    'l_p': para_length,
+                    'ans': s_tokens[sidx].slice(s[0][0], e[0][0] + 1).untokenize(),
+                    'pos': s_tokens[sidx].pos(),
+                    'ner': s_tokens[sidx].entities(),
+                    'tf': term_frequencies
+                }
+
+                with open(feat_file, 'w') as f:
+                    f.write(json.dumps(record))
+
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 
         t8 = time.time()
