@@ -2,7 +2,7 @@
 import json
 import argparse
 import ast
-import collections
+from collections import Counter
 import os
 from extract_util import extract_lines
 from drqa.retriever.utils import normalize
@@ -62,7 +62,7 @@ if __name__ == '__main__':
         if ans:
             right_ranks.append(index)
 
-    rank_counter = collections.Counter(ranks)
+    rank_counter = Counter(ranks)
     acc_rank = 0
     for rank in sorted(rank_counter.keys()):
         num = rank_counter.get(rank)
@@ -73,11 +73,10 @@ if __name__ == '__main__':
 
     print()
     acc_rank = 0
-    right_rank_counter = collections.Counter(right_ranks)
+    right_rank_counter = Counter(right_ranks)
     for rank in sorted(right_rank_counter.keys()):
         num = right_rank_counter.get(rank)
         rate = num / len(right_ranks) * 100
         acc_rank += num
         acc_rate = acc_rank / len(right_ranks) * 100
         print('%s, %s, %.1f%%, %.1f%%' % (rank, right_rank_counter.get(rank), rate, acc_rate))
-
