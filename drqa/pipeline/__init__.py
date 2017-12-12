@@ -14,7 +14,7 @@ DEFAULTS = {
     'tokenizer': CoreNLPTokenizer,
     'ranker': TfidfDocRanker,
     'reader_model': os.path.join(DATA_DIR, 'reader/multitask.mdl'),
-    'features': os.path.join(DATA_DIR, 'docs/')
+    'features': os.path.join(DATA_DIR, 'earlystopping/docs/')
 }
 
 

@@ -288,8 +288,6 @@ class DrQA(object):
             feat_file = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
 
             if not os.path.exists(feat_file):
-                s, e, ans_score = handle.get()
-                doc_score = float(all_doc_scores[qidx][rel_didx])
                 para_text = s_tokens[sidx].words(True)
                 para_length = len(para_text)
                 counter = Counter(para_text)
@@ -297,17 +295,14 @@ class DrQA(object):
                 # ner = [1 if n in Tokenizer.NER else 0 for n in s_tokens[sidx].entities()]
 
                 record = {
-                    's_p': float(doc_score),
-                    's_a': float(ans_score[0][0]),
                     'l_p': para_length,
-                    'ans': s_tokens[sidx].slice(s[0][0], e[0][0] + 1).untokenize(),
                     'pos': s_tokens[sidx].pos(),
                     'ner': s_tokens[sidx].entities(),
                     'tf': term_frequencies
                 }
 
                 with open(feat_file, 'w') as f:
-                    f.write(json.dumps(record))
+                    f.write(json.dumps(record, sort_keys=True))
 
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 
