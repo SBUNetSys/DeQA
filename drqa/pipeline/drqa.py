@@ -261,6 +261,22 @@ class DrQA(object):
                         })
                         para_lens.append(len(s_tokens[sidx].words()))
 
+                        feat_file = os.path.join(DEFAULTS['features'], '%s.json' % did)
+                        if not os.path.exists(feat_file):
+                            para_text = s_tokens[sidx].words(True)
+                            para_length = len(para_text)
+                            counter = Counter(para_text)
+                            term_frequencies = [counter[w] * 1.0 / para_length for w in para_text]
+                            # ner = [1 if n in Tokenizer.NER else 0 for n in s_tokens[sidx].entities()]
+                            record = {
+                                'l_p': para_length,
+                                'pos': s_tokens[sidx].pos(),
+                                'ner': s_tokens[sidx].entities(),
+                                'tf': term_frequencies
+                            }
+                            with open(feat_file, 'w') as f:
+                                f.write(json.dumps(record, sort_keys=True))
+
             logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
@@ -277,32 +293,9 @@ class DrQA(object):
                         'input': s_tokens[ex_id[2]],
                         'cands': candidates[ex_id[0]] if candidates else None
                     })
-                handle = self.reader.predict(
-                    batch, batch_cands, async_pool=self.processes
-                )
+                handle = self.reader.predict(batch, batch_cands, async_pool=self.processes)
             else:
                 handle = self.reader.predict(batch, async_pool=self.processes)
-
-            (qidx, rel_didx, sidx) = batch[-1][0]
-            doc_id = all_docids[qidx][rel_didx]
-            feat_file = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
-
-            if not os.path.exists(feat_file):
-                para_text = s_tokens[sidx].words(True)
-                para_length = len(para_text)
-                counter = Counter(para_text)
-                term_frequencies = [counter[w] * 1.0 / para_length for w in para_text]
-                # ner = [1 if n in Tokenizer.NER else 0 for n in s_tokens[sidx].entities()]
-
-                record = {
-                    'l_p': para_length,
-                    'pos': s_tokens[sidx].pos(),
-                    'ner': s_tokens[sidx].entities(),
-                    'tf': term_frequencies
-                }
-
-                with open(feat_file, 'w') as f:
-                    f.write(json.dumps(record, sort_keys=True))
 
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 
