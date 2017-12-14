@@ -5,7 +5,7 @@ import os
 from collections import OrderedDict
 from drqa.retriever.utils import normalize
 from drqa.pipeline import DEFAULTS
-
+from drqa.reader.utils import exact_match_score, metric_max_over_ground_truths
 ENCODING = "utf-8"
 
 if __name__ == '__main__':
@@ -34,10 +34,11 @@ if __name__ == '__main__':
                 record = OrderedDict()
                 record['q'] = question
                 record['d_id'] = doc_id
-                record['a'] = entry['span']
+                record['a'] = normalize(entry['span'])
                 record['a_s'] = entry['span_score']
                 record['d_s'] = entry['doc_score']
-                record['stop'] = 1 if entry['span'].lower() in list(map(lambda x: x.lower(), answer)) else 0
+                exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
+                record['stop'] = 1 if exact_match else 0
 
                 doc_path = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
                 if os.path.exists(doc_path):
