@@ -22,8 +22,8 @@ from .. import reader
 from .. import tokenizers
 from . import DEFAULTS
 import logging
+import string
 import time
-from ..tokenizers.tokenizer import Tokenizer
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------------
@@ -243,18 +243,36 @@ class DrQA(object):
         # mappings to their question, document, and split ids.
         examples = []
         for qidx in range(len(queries)):
-            para_lens = []
+            word_dict = self.reader.word_dict
+            q_text = q_tokens[qidx].words()
+            exclude = set(string.punctuation)
+            q_id = '_'.join(ch for ch in q_text if ch not in exclude)
+            q_feat_file = os.path.join(DEFAULTS['features'], '%s.json' % q_id)
+            if not os.path.exists(q_feat_file):
+                para_length = len(q_text)
+                counter = Counter(q_text)
+                tf = ['%.6f' % (counter[w] * 1.0 / para_length) for w in q_text]
+                idx = [word_dict[w] for w in q_text]
+                record = {
+                    'idx': idx,
+                    'pos': q_tokens[qidx].pos(),
+                    'ner': q_tokens[qidx].entities(),
+                    'tf': tf
+                }
+                with open(q_feat_file, 'w') as f:
+                    f.write(json.dumps(record, sort_keys=True))
 
+            para_lens = []
             for rel_didx, did in enumerate(all_docids[qidx]):
                 start, end = didx2sidx[did2didx[did]]
                 for sidx in range(start, end):
-                    if (len(q_tokens[qidx].words()) > 0 and
-                            len(s_tokens[sidx].words()) > 0):
+                    para_text = s_tokens[sidx].words()
+                    if len(q_text) > 0 and len(para_text) > 0:
                         examples.append({
                             'id': (qidx, rel_didx, sidx),
-                            'question': q_tokens[qidx].words(),
+                            'question': q_text,
                             'qlemma': q_tokens[qidx].lemmas(),
-                            'document': s_tokens[sidx].words(),
+                            'document': para_text,
                             'lemma': s_tokens[sidx].lemmas(),
                             'pos': s_tokens[sidx].pos(),
                             'ner': s_tokens[sidx].entities(),
@@ -263,16 +281,16 @@ class DrQA(object):
 
                         feat_file = os.path.join(DEFAULTS['features'], '%s.json' % did)
                         if not os.path.exists(feat_file):
-                            para_text = s_tokens[sidx].words(True)
                             para_length = len(para_text)
                             counter = Counter(para_text)
-                            term_frequencies = [counter[w] * 1.0 / para_length for w in para_text]
-                            # ner = [1 if n in Tokenizer.NER else 0 for n in s_tokens[sidx].entities()]
+                            tf = ['%.6f' % (counter[w] * 1.0 / para_length) for w in para_text]
+                            idx = [word_dict[w] for w in para_text]
+
                             record = {
-                                'l_p': para_length,
                                 'pos': s_tokens[sidx].pos(),
                                 'ner': s_tokens[sidx].entities(),
-                                'tf': term_frequencies
+                                'tf': tf,
+                                'idx': idx
                             }
                             with open(feat_file, 'w') as f:
                                 f.write(json.dumps(record, sort_keys=True))
