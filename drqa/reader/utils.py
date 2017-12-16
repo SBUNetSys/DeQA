@@ -170,6 +170,16 @@ def build_feature_dict(args, examples):
 # Evaluation. Follows official evalutation script for v1.1 of the SQuAD dataset.
 # ------------------------------------------------------------------------------
 
+def slugify(value):
+    """
+    Normalizes string, converts to lowercase, removes non-alpha characters,
+    and converts spaces to hyphens.
+    """
+    import unicodedata
+    value = unicodedata.normalize('NFKD', value)
+    value = re.sub('[^\w\s-]', '', value).strip().lower()
+    return re.sub('[-\s]+', '-', value)
+
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""

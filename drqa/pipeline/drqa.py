@@ -22,7 +22,7 @@ from .. import reader
 from .. import tokenizers
 from . import DEFAULTS
 import logging
-import string
+from ..reader.utils import slugify
 import time
 logger = logging.getLogger(__name__)
 
@@ -245,8 +245,7 @@ class DrQA(object):
         for qidx in range(len(queries)):
             word_dict = self.reader.word_dict
             q_text = q_tokens[qidx].words()
-            exclude = set(string.punctuation)
-            q_id = '_'.join(ch for ch in q_text if ch not in exclude)
+            q_id = '_'.join(slugify(w) for w in q_text )
             q_feat_file = os.path.join(DEFAULTS['features'], '%s.json' % q_id)
             if not os.path.exists(q_feat_file):
                 para_length = len(q_text)
