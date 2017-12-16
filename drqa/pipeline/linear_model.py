@@ -2,52 +2,72 @@
 import json
 import argparse
 import os
-from collections import Counter, OrderedDict
-from drqa.retriever.utils import normalize
-from drqa.pipeline import DEFAULTS
-from drqa import DATA_DIR
-import pickle
-ENCODING = "utf-8"
-
-from itertools import count
-
 import torch
+import torch.nn as nn
 import torch.autograd
 import torch.nn.functional as F
+from torch.utils.data import Dataset
+from torch.utils.data.sampler import Sampler
 from torch.autograd import Variable
-
-POLY_DEGREE = 4
-W_target = torch.randn(POLY_DEGREE, 1) * 5
-b_target = torch.randn(1) * 5
-
-
-def make_features(x):
-    """Builds features i.e. a matrix with columns [x, x^2, x^3, x^4]."""
-    x = x.unsqueeze(1)
-    return torch.cat([x ** i for i in range(1, POLY_DEGREE + 1)], 1)
-
-def make_label(record_):
-
-def f(x):
-    """Approximated function."""
-    return x.mm(W_target) + b_target[0]
+import logging
+import time
+logger = logging.getLogger(__name__)
+ENCODING = "utf-8"
 
 
-def poly_desc(W, b):
-    """Creates a string description of a polynomial."""
-    result = 'y = '
-    for i, w in enumerate(W):
-        result += '{:+.2f} x^{} '.format(w, len(W) - i)
-    result += '{:+.2f}'.format(b[0])
-    return result
+class EarlyStoppingModel(nn.Module):  # inheriting from nn.Module!
+
+    def __init__(self, num_labels, vocab_size):
+        super(EarlyStoppingModel, self).__init__()
+
+        # Define the parameters that you will need.  In this case, we need A and b,
+        # the parameters of the affine mapping.
+        # Torch defines nn.Linear(), which provides the affine map.
+        # Make sure you understand why the input dimension is vocab_size
+        # and the output is num_labels!
+        self.linear = nn.Linear(vocab_size, num_labels)
+
+        # NOTE! The non-linearity log softmax does not have parameters! So we don't need
+        # to worry about that here
+
+    def forward(self, bow_vec):
+        # Pass the input through the linear layer,
+        # then pass that through log_softmax.
+        # Many non-linearities and other functions are in torch.nn.functional
+        return F.log_softmax(self.linear(bow_vec))
 
 
-def get_batch(batch_size=32):
-    """Builds a batch i.e. (x, f(x)) pair."""
-    random = torch.randn(batch_size)
-    x = make_features(random)
-    y = f(x)
-    return Variable(x), Variable(y)
+def batchify(batch_):
+
+    return torch.LongTensor(batch_)
+
+
+class RecordDataset(Dataset):
+
+    def __init__(self, records_, has_answer=False):
+        self.records_ = records_
+        self.has_answer = has_answer
+        # logger.info('Loading model %s' % weights_file)
+        # saved_params = torch.load(weights_file, map_location=lambda storage, loc: storage)
+        # self.word_dict = saved_params['word_dict']
+        # self.state_dict = saved_params['state_dict']
+
+    def __len__(self):
+        return len(self.records_)
+
+    def __getitem__(self, index):
+        return self.vectorize(self.records_[index],  self.has_answer)
+
+    def vectorize(self, record_, has_answer=False):
+        answer = record_['a']
+        answer_score = record_['a_s']
+        doc_score = record_['d_s']
+        question = record_['q']
+        ner = record_['ner']
+        pos = record_['pos']
+        tf = record_['tf']
+        if has_answer:
+            label = record_['stop']
 
 
 if __name__ == '__main__':
@@ -56,16 +76,12 @@ if __name__ == '__main__':
                         default='../../data/earlystopping/records-10.txt')
 
     args = parser.parse_args()
-    record_file = args.record_file
-    if record_file.endswith('.json'):
-        records = json.loads(open(record_file, encoding=ENCODING).read())
-    elif record_file.endswith('.pkl'):
-        records = pickle.load(open(record_file, 'rb'))
-    else:
-        print('only .json and .pkl record formats are supported')
-        exit(-1)
+    NUM_LABELS = 2
 
-    print(records)
+    record_file = args.record_file
+    for data_line in open(record_file, encoding=ENCODING):
+        data = json.loads(data_line)
+
     # # Define model
     # fc = torch.nn.Linear(W_target.size(0), 1)
     #
