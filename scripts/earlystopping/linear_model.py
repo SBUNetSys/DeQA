@@ -11,6 +11,7 @@ from torch.utils.data.sampler import Sampler
 from torch.autograd import Variable
 import logging
 import time
+from drqa.tokenizers.tokenizer import Tokenizer
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
 
