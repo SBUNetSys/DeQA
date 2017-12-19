@@ -34,7 +34,7 @@ class EarlyStoppingClassifier(nn.Module):
         self.linear = nn.Linear(DIM, NUM_CLASS)
 
     def forward(self, input_):
-        return F.log_softmax(self.linear(input_), dim=0)
+        return F.log_softmax(self.linear(input_))
 
 
 class EarlyStoppingModel(object):
@@ -329,7 +329,7 @@ if __name__ == '__main__':
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
     parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
-    parser.add_argument('--data_workers', type=int, default=os.cpu_count()/2,
+    parser.add_argument('--data_workers', type=int, default=int(os.cpu_count()/2),
                         help='Number of subprocesses for data loading')
     parser.add_argument('--parallel', action='store_true',
                         help='Use DataParallel on all available GPUs')
