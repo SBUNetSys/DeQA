@@ -251,7 +251,7 @@ class DrQA(object):
             if not os.path.exists(q_feat_file):
                 para_length = len(q_text)
                 counter = Counter(q_text)
-                tf = ['%.6f' % (counter[w] * 1.0 / para_length) for w in q_text]
+                tf = [round(counter[w] * 1.0 / para_length, 6) for w in q_text]
                 idx = [word_dict[w] for w in q_text]
                 record = {
                     'idx': idx,
@@ -283,7 +283,7 @@ class DrQA(object):
                         if not os.path.exists(feat_file):
                             para_length = len(para_text)
                             counter = Counter(para_text)
-                            tf = ['%.6f' % (counter[w] * 1.0 / para_length) for w in para_text]
+                            tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
                             idx = [word_dict[w] for w in para_text]
 
                             record = {
