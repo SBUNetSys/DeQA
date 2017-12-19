@@ -359,6 +359,7 @@ if __name__ == '__main__':
         logger.info('train: Epoch %d done. Time for epoch = %.2f (s)' %
                     (stats['epoch'], epoch_time.time()))
 
+        # TODO: validation accuracy and checkpointing
         # Validate unofficial (train)
         # validate_unofficial(args, train_loader, model, stats, mode='train')
 
@@ -366,32 +367,3 @@ if __name__ == '__main__':
     # if args.checkpoint:
     #     model.checkpoint(args.model_file + '.checkpoint',
     #                      global_stats['epoch'] + 1)
-
-    # # Define model
-    # fc = torch.nn.Linear(W_target.size(0), 1)
-    #
-    # for batch_idx in count(1):
-    #     # Get data
-    #     batch_x, batch_y = get_batch()
-    #
-    #     # Reset gradients
-    #     fc.zero_grad()
-    #
-    #     # Forward pass
-    #     output = F.smooth_l1_loss(fc(batch_x), batch_y)
-    #     loss = output.data[0]
-    #
-    #     # Backward pass
-    #     output.backward()
-    #
-    #     # Apply gradients
-    #     for param in fc.parameters():
-    #         param.data.add_(-0.1 * param.grad.data)
-    #
-    #     # Stop criterion
-    #     if loss < 1e-3:
-    #         break
-    #
-    #     print('Loss: {:.6f} after {} batches'.format(loss, batch_idx))
-    # print('==> Learned function:\t' + poly_desc(fc.weight.data.view(-1), fc.bias.data))
-    # print('==> Actual function:\t' + poly_desc(W_target.view(-1), b_target))
