@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
                 s = entry['start']
                 e = entry['end']
-
+                record['a_loc'] = [int(s), int(e)]
                 doc_path = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
                 if os.path.exists(doc_path):
                     doc_data = open(doc_path, encoding=ENCODING).read()
@@ -68,8 +68,8 @@ if __name__ == '__main__':
                     record['p_ner'] = feature['ner']
                     record['p_pos'] = feature['pos']
 
-                    a_idx = feature['idx'][int(s):int(e) + 1]
-                    record['a_idx'] = a_idx
+                    # a_idx = feature['idx'][int(s):int(e) + 1]
+                    # record['a_idx'] = a_idx
                 else:
                     print('%s not exist!' % doc_path)
                     doc_missing_count += 1
