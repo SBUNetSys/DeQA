@@ -7,6 +7,7 @@ from drqa.retriever.utils import normalize
 from drqa.pipeline import DEFAULTS
 from drqa.reader.utils import exact_match_score, metric_max_over_ground_truths
 from drqa.reader.utils import slugify
+
 ENCODING = "utf-8"
 
 if __name__ == '__main__':
@@ -54,6 +55,10 @@ if __name__ == '__main__':
                 record['q_tf'] = q_feature['tf']
                 record['q_ner'] = q_feature['ner']
                 record['q_pos'] = q_feature['pos']
+
+                s = entry['start']
+                e = entry['end']
+
                 doc_path = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
                 if os.path.exists(doc_path):
                     doc_data = open(doc_path, encoding=ENCODING).read()
@@ -62,6 +67,9 @@ if __name__ == '__main__':
                     record['p_tf'] = feature['tf']
                     record['p_ner'] = feature['ner']
                     record['p_pos'] = feature['pos']
+
+                    a_idx = feature['idx'][int(s):int(e) + 1]
+                    record['a_idx'] = a_idx
                 else:
                     print('%s not exist!' % doc_path)
                     doc_missing_count += 1
@@ -70,4 +78,3 @@ if __name__ == '__main__':
                 print('processed %d records...' % no)
 
     print('%d docs not found' % doc_missing_count)
-
