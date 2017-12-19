@@ -344,8 +344,8 @@ class DrQA(object):
                 score, (qidx, rel_didx, sidx), s, e = heapq.heappop(queue)
                 prediction = {
                     'doc_id': all_docids[qidx][rel_didx],
-                    'start': s,
-                    'end': e,
+                    'start': str(s),
+                    'end': str(e),
                     'span': s_tokens[sidx].slice(s, e + 1).untokenize(),
                     'doc_score': float(all_doc_scores[qidx][rel_didx]),
                     'span_score': float(score),
