@@ -348,7 +348,7 @@ if __name__ == '__main__':
                         help='Gradient clipping')
     parser.add_argument('--weight_decay', type=float, default=0,
                         help='Weight decay factor')
-    parser.add_argument('--split_ratio', type=float, default=0.9,
+    parser.add_argument('--split_ratio', type=float, default=0.7,
                         help='ratio of train/dev')
     parser.add_argument('--momentum', type=float, default=0,
                         help='Momentum factor')
