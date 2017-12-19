@@ -17,13 +17,19 @@ from drqa.reader import utils
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
+NUM_CLASS = 2
+MAX_A_LEN = 15
+MAX_Q_LEN = 20
+MAX_P_LEN = 800
+NLP_NUM = len(Tokenizer.NER) + len(Tokenizer.POS)
+DIM = 2 + MAX_A_LEN * NLP_NUM + MAX_Q_LEN * NLP_NUM + MAX_P_LEN * (NLP_NUM + 1)
 
 
-class EarlyStoppingClassifier(nn.Module):  # inheriting from nn.Module!
+class EarlyStoppingClassifier(nn.Module):
 
-    def __init__(self, args):
+    def __init__(self):
         super(EarlyStoppingClassifier, self).__init__()
-        self.linear = nn.Linear(2, 1)
+        self.linear = nn.Linear(DIM, NUM_CLASS)
 
     def forward(self, input_):
         return F.log_softmax(self.linear(input_))
@@ -31,10 +37,10 @@ class EarlyStoppingClassifier(nn.Module):  # inheriting from nn.Module!
 
 class EarlyStoppingModel(object):
 
-    def __init__(self, args):
+    def __init__(self, args_):
         self.updates = 0
-        self.args = args
-        self.network = EarlyStoppingClassifier(args)
+        self.args = args_
+        self.network = EarlyStoppingClassifier()
 
     def update(self, ex):
         """Forward a batch of examples; step the optimizer to update weights."""
@@ -46,15 +52,14 @@ class EarlyStoppingModel(object):
 
         # Transfer to GPU
         if self.args.cuda:
-            inputs = [e if e is None else Variable(e.cuda(async=True))
-                      for e in ex[:4]]
-            target = Variable(ex[5].cuda(async=True))
+            inputs = Variable(ex[0].cuda(async=True))
+            target = Variable(ex[1].cuda(async=True))
         else:
-            inputs = [e if e is None else Variable(e) for e in ex[:4]]
-            target = Variable(ex[5])
+            inputs = Variable(ex[0])
+            target = Variable(ex[1])
 
         # Run forward
-        score_ = self.network(*inputs)
+        score_ = self.network(inputs)
 
         # Compute loss and accuracies
 
@@ -77,10 +82,10 @@ class EarlyStoppingModel(object):
 
         return loss.data[0], ex[0].size(0)
 
-    def predict(self, record_):
+    def predict(self, ex):
         self.network.eval()
         # Transfer to GPU
-        if self.use_cuda:
+        if self.args.cuda:
             inputs = [e if e is None else
                       Variable(e.cuda(async=True), volatile=True)
                       for e in ex[:5]]
@@ -109,63 +114,58 @@ class EarlyStoppingModel(object):
 def batchify(batch_):
     NUM_INPUTS = 5
     NUM_LABEL = 1
+    length = len(batch_)
     ans_scores = [one[0] for one in batch_]
-    max_length = max([d.size(0) for d in ans_scores])
-    ans_t = torch.FloatTensor(len(ans_scores), max_length).zero_()
+    ans_t = torch.zeros(length, 1)
     for i, d in enumerate(ans_scores):
         ans_t[i, :d.size(0)].copy_(d)
 
     doc_scores = [one[1] for one in batch_]
-    max_length = max([d.size(0) for d in doc_scores])
-    doc_t = torch.FloatTensor(len(doc_scores), max_length).zero_()
-    for i, d in enumerate(ans_scores):
+    doc_t = torch.zeros(length, 1)
+    for i, d in enumerate(doc_scores):
         doc_t[i, :d.size(0)].copy_(d)
 
-    answer_emb = [one[2] for one in batch_]
-    max_length = max([d.size(0) for d in answer_emb])
-    a_emb_t = torch.FloatTensor(len(answer_emb), max_length, answer_emb[0].size(1)).zero_()
-    for i, d in enumerate(answer_emb):
-        # FIXME:
-        a_emb_t[i, :d.size(0)].copy_(d)
+    answer_feature = [one[2] for one in batch_]
+    a_f_t = torch.zeros(length, MAX_A_LEN * NLP_NUM)
+    for i, d in enumerate(answer_feature):
+        a_f_t[i].copy_(d.view(MAX_A_LEN * NLP_NUM))
 
     question_feature = [one[3] for one in batch_]
-    max_length = max([d.size(0) for d in question_feature])
-    q_f_t = torch.FloatTensor(len(question_feature), max_length, question_feature[0].size(1)).zero_()
+    q_f_t = torch.zeros(length, MAX_Q_LEN * NLP_NUM)
     for i, d in enumerate(question_feature):
-        q_f_t[i, :d.size(0)].copy_(d)
+        q_f_t[i].copy_(d.view(MAX_Q_LEN * NLP_NUM))
 
     paragraph_feature = [one[4] for one in batch_]
-    max_length = max([d.size(0) for d in paragraph_feature])
-    p_f_t = torch.FloatTensor(len(paragraph_feature), max_length, paragraph_feature[0].size(1)).zero_()
+    p_f_t = torch.zeros(length, MAX_P_LEN * (NLP_NUM + 1))
     for i, d in enumerate(paragraph_feature):
-        p_f_t[i, :d.size(0)].copy_(d)
+        p_f_t[i].copy_(d.view(MAX_P_LEN * (NLP_NUM + 1)))
 
     if len(batch_[0]) == NUM_INPUTS:
-        return ans_t, doc_t, a_emb_t, q_f_t, p_f_t
+        return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
+                      q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1)
     elif len(batch_[0]) == (NUM_INPUTS + NUM_LABEL):
         label = [one[5] for one in batch_]
-        max_length = max([d.size(0) for d in label])
-        l_t = torch.FloatTensor(len(label), max_length).zero_()
+        l_t = torch.LongTensor(len(label), 1).zero_()
         for i, d in enumerate(label):
-            l_t[i, :d.size(0)].copy_(d)
-
+            l_t[i].copy_(d)
     else:
         raise RuntimeError('Incorrect number of inputs per batch')
-    return ans_t, doc_t, a_emb_t, q_f_t, p_f_t, l_t
+    return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
+                      q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1), l_t.view(length)
 
 
 class RecordDataset(Dataset):
 
-    def __init__(self, records_, weight_file_, has_answer=False):
+    def __init__(self, records_, has_answer=False):
         self.records_ = records_
         self.has_answer = has_answer
-        logger.info('Loading model %s' % weight_file_)
-        saved_params = torch.load(weight_file_, map_location=lambda storage, loc: storage)
-        state_dict = saved_params['state_dict']
-        emb_weights = state_dict['embedding.weight']
-        self.embedding = nn.Embedding(emb_weights.size(0), emb_weights.size(1), padding_idx=0)
-        self.embedding.weight = nn.Parameter(emb_weights)
-        self.embedding.weight.requires_grad = False
+        # logger.info('Loading model %s' % weight_file_)
+        # saved_params = torch.load(weight_file_, map_location=lambda storage, loc: storage)
+        # state_dict = saved_params['state_dict']
+        # emb_weights = state_dict['embedding.weight']
+        # self.embedding = nn.Embedding(emb_weights.size(0), emb_weights.size(1), padding_idx=0)
+        # self.embedding.weight = nn.Parameter(emb_weights)
+        # self.embedding.weight.requires_grad = False
 
     def __len__(self):
         return len(self.records_)
@@ -195,64 +195,76 @@ class RecordDataset(Dataset):
         d_s = record_['d_s']
         d_s_t = torch.FloatTensor([d_s])
 
-        a_idx = record_['a_idx']
-        a_idx_t = torch.LongTensor(a_idx)
-        a_emb = self.embedding(a_idx_t)
-
         p_ner = record_['p_ner']
-        p_ner_t = torch.zeros(len(p_ner), len(Tokenizer.NER))
+        p_ner_t = torch.zeros(MAX_P_LEN, len(Tokenizer.NER))
         for i, w in enumerate(p_ner):
             if w in Tokenizer.NER_DICT:
                 p_ner_t[i][Tokenizer.NER_DICT[w]] = 1.0
 
         p_pos = record_['p_pos']
-        p_pos_t = torch.zeros(len(p_pos), len(Tokenizer.POS))
+        p_pos_t = torch.zeros(MAX_P_LEN, len(Tokenizer.POS))
         for i, w in enumerate(p_pos):
             if w in Tokenizer.POS_DICT:
                 p_pos_t[i][Tokenizer.POS_DICT[w]] = 1.0
 
+        s, e = record_['a_loc']
+        a_ner = p_ner[s:e+1]
+        a_ner_t = torch.zeros(MAX_A_LEN, len(Tokenizer.NER))
+        for i, w in enumerate(a_ner):
+            if w in Tokenizer.NER_DICT:
+                a_ner_t[i][Tokenizer.NER_DICT[w]] = 1.0
+
+        a_pos = p_pos[s:e+1]
+        a_pos_t = torch.zeros(MAX_A_LEN, len(Tokenizer.POS))
+        for i, w in enumerate(a_pos):
+            if w in Tokenizer.POS_DICT:
+                a_pos_t[i][Tokenizer.POS_DICT[w]] = 1.0
+
+        a_f = torch.cat([a_ner_t, a_pos_t], dim=1)
+
         p_tf = record_['p_tf']
-        p_tf_t = torch.FloatTensor(p_tf).view(-1, 1)
+        p_tf_t = torch.zeros(MAX_P_LEN)
+        p_tf_t[:len(p_tf)].copy_(torch.FloatTensor(p_tf))
 
-        p_idx = record_['p_idx']
-        p_idx_t = torch.LongTensor(p_idx)
-        p_emb = self.embedding(p_idx_t)
+        # p_idx = record_['p_idx']
+        # p_idx_t = torch.LongTensor(p_idx)
+        # p_emb = self.embedding(p_idx_t)
 
-        p_f = torch.cat([p_emb, p_ner_t, p_pos_t, p_tf_t], dim=1)
+        p_f = torch.cat([p_ner_t, p_pos_t, p_tf_t.view(-1, 1)], dim=1)
         q_ner = record_['q_ner']
-        q_ner_t = torch.zeros(len(q_ner), len(Tokenizer.NER))
+        q_ner_t = torch.zeros(MAX_Q_LEN, len(Tokenizer.NER))
         for i, w in enumerate(q_ner):
             if w in Tokenizer.NER_DICT:
                 q_ner_t[i][Tokenizer.NER_DICT[w]] = 1.0
 
         q_pos = record_['q_pos']
-        q_pos_t = torch.zeros(len(q_pos), len(Tokenizer.POS))
+        q_pos_t = torch.zeros(MAX_Q_LEN, len(Tokenizer.POS))
         for i, w in enumerate(q_pos):
             if w in Tokenizer.POS_DICT:
                 q_pos_t[i][Tokenizer.POS_DICT[w]] = 1.0
 
-        q_tf = record_['q_tf']
-        q_tf_t = torch.FloatTensor(q_tf).view(-1, 1)
+        # q_tf = record_['q_tf']
+        # q_tf_t = torch.zeros(MAX_Q_LEN, 1)
+        # q_tf_t[:len(p_tf), 0].copy_(torch.FloatTensor(q_tf).view(-1, 1))
 
-        q_idx = record_['q_idx']
-        q_idx_t = torch.LongTensor(q_idx)
-        q_emb = self.embedding(q_idx_t)
-        q_f = torch.cat([q_emb, q_ner_t, q_pos_t, q_tf_t], dim=1)
+        # q_idx = record_['q_idx']
+        # q_idx_t = torch.LongTensor(q_idx)
+        # q_emb = self.embedding(q_idx_t)
+        q_f = torch.cat([q_ner_t, q_pos_t], dim=1)
 
         if has_label:
             label = record_['stop']
-            l_t = torch.FloatTensor([label])
-            return a_s_t, d_s_t, a_emb, q_f, p_f, l_t
+            l_t = torch.LongTensor([label])
+            return a_s_t, d_s_t, a_f, q_f, p_f, l_t
         else:
-            return a_s_t, d_s_t, a_emb, q_f, p_f
+            return a_s_t, d_s_t, a_f, q_f, p_f
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--record_file',
                         default='../../data/earlystopping/records-10.txt')
-    parser.add_argument('-w', '--weight_file',
-                        default='../../data/reader/multitask.mdl')
+    # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
     parser.add_argument('--no_cuda', type=bool, default=False,
                         help='Train on CPU, even if GPUs are available.')
     parser.add_argument('--data_workers', type=int, default=5,
@@ -283,16 +295,24 @@ if __name__ == '__main__':
     torch.manual_seed(args.random_seed)
     if args.cuda:
         torch.cuda.manual_seed(args.random_seed)
-
-    weight_file = args.weight_file
-
+    # Set logging
+    logger.setLevel(logging.INFO)
+    fmt = logging.Formatter('%(asctime)s: [ %(message)s ]',
+                            '%m/%d/%Y %I:%M:%S %p')
+    console = logging.StreamHandler()
+    console.setFormatter(fmt)
+    logger.addHandler(console)
     record_file = args.record_file
     records = []
     for data_line in open(record_file, encoding=ENCODING):
         record = json.loads(data_line)
         records.append(record)
 
-    train_dataset = RecordDataset(records[:-1000], weight_file, has_answer=True)
+    # max_a_len = max([len(r['a_idx']) for r in records])
+    # max_q_len = max([len(r['q_idx']) for r in records])
+    # max_p_len = max([len(r['p_idx']) for r in records])
+
+    train_dataset = RecordDataset(records[:-1000], has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -303,7 +323,7 @@ if __name__ == '__main__':
         pin_memory=args.cuda,
     )
 
-    dev_dataset = RecordDataset(records[-1000:], weight_file, has_answer=False)
+    dev_dataset = RecordDataset(records[-1000:], has_answer=False)
     dev_sampler = torch.utils.data.sampler.SequentialSampler(dev_dataset)
     dev_loader = torch.utils.data.DataLoader(
         dev_dataset,
@@ -317,29 +337,35 @@ if __name__ == '__main__':
     model = EarlyStoppingModel(args)
     model.init_optimizer()
 
-    for batch in train_loader:
-        model.update(batch)
+    # --------------------------------------------------------------------------
+    # TRAIN/VALID LOOP
+    logger.info('-' * 100)
+    logger.info('Starting training...')
+    stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
+    for epoch in range(0, args.epochs):
+        stats['epoch'] = epoch
+        train_loss = utils.AverageMeter()
+        epoch_time = utils.Timer()
+        # Run one epoch
+        for idx, ex in enumerate(train_loader):
+            train_loss.update(*model.update(ex))
 
-    train_loss = utils.AverageMeter()
-    epoch_time = utils.Timer()
-    # Run one epoch
-    for idx, ex in enumerate(train_loader):
-        train_loss.update(*model.update(ex))
-
-        if idx % args.display_iter == 0:
             logger.info('train: Epoch = %d | iter = %d/%d | ' %
-                        (global_stats['epoch'], idx, len(data_loader)) +
+                        (stats['epoch'], idx, len(train_loader)) +
                         'loss = %.2f | elapsed time = %.2f (s)' %
-                        (train_loss.avg, global_stats['timer'].time()))
+                        (train_loss.avg, stats['timer'].time()))
             train_loss.reset()
 
-    logger.info('train: Epoch %d done. Time for epoch = %.2f (s)' %
-                (global_stats['epoch'], epoch_time.time()))
+        logger.info('train: Epoch %d done. Time for epoch = %.2f (s)' %
+                    (stats['epoch'], epoch_time.time()))
+
+        # Validate unofficial (train)
+        # validate_unofficial(args, train_loader, model, stats, mode='train')
 
     # Checkpoint
-    if args.checkpoint:
-        model.checkpoint(args.model_file + '.checkpoint',
-                         global_stats['epoch'] + 1)
+    # if args.checkpoint:
+    #     model.checkpoint(args.model_file + '.checkpoint',
+    #                      global_stats['epoch'] + 1)
 
     # # Define model
     # fc = torch.nn.Linear(W_target.size(0), 1)
