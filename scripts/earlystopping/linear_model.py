@@ -14,13 +14,14 @@ import logging
 import time
 from drqa.tokenizers.tokenizer import Tokenizer
 from drqa.reader import utils
+from drqa.pipeline import DEFAULTS
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
 NUM_CLASS = 2
 MAX_A_LEN = 15
-MAX_Q_LEN = 20
-MAX_P_LEN = 800
+MAX_Q_LEN = 34
+MAX_P_LEN = 2683
 NLP_NUM = len(Tokenizer.NER) + len(Tokenizer.POS)
 DIM = 2 + MAX_A_LEN * NLP_NUM + MAX_Q_LEN * NLP_NUM + MAX_P_LEN * (NLP_NUM + 1)
 
@@ -37,10 +38,16 @@ class EarlyStoppingClassifier(nn.Module):
 
 class EarlyStoppingModel(object):
 
-    def __init__(self, args_):
+    def __init__(self, args_, state_dict_=None):
         self.updates = 0
         self.args = args_
         self.network = EarlyStoppingClassifier()
+        if state_dict_:
+            self.network.load_state_dict(state_dict_)
+        if self.args.cuda:
+            self.network.cuda()
+        if self.args.parallel:
+            self.network = torch.nn.DataParallel(self.network)
 
     def update(self, ex):
         """Forward a batch of examples; step the optimizer to update weights."""
@@ -82,20 +89,33 @@ class EarlyStoppingModel(object):
 
         return loss.data[0], ex[0].size(0)
 
-    def predict(self, ex):
+    def predict(self, inputs):
         self.network.eval()
-        # Transfer to GPU
         if self.args.cuda:
-            inputs = [e if e is None else
-                      Variable(e.cuda(async=True), volatile=True)
-                      for e in ex[:5]]
+            inputs_var = Variable(inputs.cuda(async=True))
         else:
-            inputs = [e if e is None else Variable(e, volatile=True)
-                      for e in ex[:5]]
+            inputs_var = Variable(inputs)
         # Run forward
-        score_ = self.network(*inputs)
+        score_ = self.network(inputs_var)
         score = score_.data.cpu()
-        return 1 if score > 0.5 else 0
+        dim = 0 if len(score.size()) == 1 else 1
+        _, pred = torch.max(score, dim)
+        return pred
+
+    def eval(self, data_loader_, mode='dev'):
+        total = 0
+        correct = 0
+        for batch_ in data_loader_:
+            batch_size = batch_[0].size(0)
+            total += batch_size
+            preds_ = self.predict(batch_[0])
+            labels_ = batch_[1]
+            correct += (preds_.numpy() == labels_.numpy()).sum()
+
+            # If getting train accuracies, sample max 10k
+            if mode == 'train' and total >= 1e4:
+                break
+        return correct / total * 100
 
     def init_optimizer(self):
         parameters = [p for p in self.network.parameters() if p.requires_grad]
@@ -109,6 +129,33 @@ class EarlyStoppingModel(object):
         else:
             raise RuntimeError('Unsupported optimizer: %s' %
                                self.args.optimizer)
+
+    def checkpoint(self, file_name, epoch_):
+        params = {
+            'state_dict': self.network.state_dict(),
+            'args': self.args,
+            'epoch': epoch_,
+            'optimizer': self.optimizer.state_dict(),
+        }
+        try:
+            torch.save(params, file_name)
+        except Exception as e:
+            logger.warning('WARN: %s Saving failed... continuing anyway.' % e)
+
+    def save(self, file_name):
+        params = {'state_dict': self.network.state_dict(), 'args': self.args}
+        try:
+            torch.save(params, file_name)
+        except Exception as e:
+            logger.warning('WARN: %s Saving failed... continuing anyway.' % e)
+
+    @staticmethod
+    def load(filename):
+        logger.info('Loading model %s' % filename)
+        saved_params = torch.load(filename, map_location=lambda storage, loc: storage)
+        state_dict = saved_params['state_dict']
+        args_ = saved_params['args']
+        return EarlyStoppingModel(args_, state_dict)
 
 
 def batchify(batch_):
@@ -195,6 +242,20 @@ class RecordDataset(Dataset):
         d_s = record_['d_s']
         d_s_t = torch.FloatTensor([d_s])
 
+        doc_id = record_['doc_id']
+        doc_path = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
+        if os.path.exists(doc_path):
+            doc_data = open(doc_path, encoding=ENCODING).read()
+            feature = json.loads(doc_data)
+            record_['p_tf'] = feature['tf']
+            record_['p_ner'] = feature['ner']
+            record_['p_pos'] = feature['pos']
+
+            # a_idx = feature['idx'][int(s):int(e) + 1]
+            # record['a_idx'] = a_idx
+        else:
+            print('warning: %s not exist!' % doc_path)
+
         p_ner = record_['p_ner']
         p_ner_t = torch.zeros(MAX_P_LEN, len(Tokenizer.NER))
         for i, w in enumerate(p_ner):
@@ -265,11 +326,11 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--record_file',
                         default='../../data/earlystopping/records-10.txt')
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
-    parser.add_argument('--no_cuda', type=bool, default=False,
+    parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
     parser.add_argument('--data_workers', type=int, default=5,
                         help='Number of subprocesses for data loading')
-    parser.add_argument('--parallel', type=bool, default=False,
+    parser.add_argument('--parallel', action='store_true',
                         help='Use DataParallel on all available GPUs')
     parser.add_argument('--random_seed', type=int, default=1013,
                         help=('Random seed for all numpy/torch/cuda '
@@ -288,6 +349,10 @@ if __name__ == '__main__':
                         help='Weight decay factor')
     parser.add_argument('--momentum', type=float, default=0,
                         help='Momentum factor')
+    parser.add_argument('--model_file', type=str, default=DEFAULTS['linear_model'],
+                        help='Unique model identifier (.mdl, .txt, .checkpoint)')
+    parser.add_argument('--checkpoint', type=bool, default=True,
+                        help='Save model + optimizer state after each epoch')
     args = parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -304,15 +369,13 @@ if __name__ == '__main__':
     logger.addHandler(console)
     record_file = args.record_file
     records = []
+    logger.info('reading data records: %s' % record_file)
     for data_line in open(record_file, encoding=ENCODING):
         record = json.loads(data_line)
         records.append(record)
 
-    # max_a_len = max([len(r['a_idx']) for r in records])
-    # max_q_len = max([len(r['q_idx']) for r in records])
-    # max_p_len = max([len(r['p_idx']) for r in records])
-
-    train_dataset = RecordDataset(records[:-1000], has_answer=True)
+    divider = int(0.9 * len(records))
+    train_dataset = RecordDataset(records[:divider], has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -322,8 +385,7 @@ if __name__ == '__main__':
         collate_fn=batchify,
         pin_memory=args.cuda,
     )
-
-    dev_dataset = RecordDataset(records[-1000:], has_answer=False)
+    dev_dataset = RecordDataset(records[divider:], has_answer=False)
     dev_sampler = torch.utils.data.sampler.SequentialSampler(dev_dataset)
     dev_loader = torch.utils.data.DataLoader(
         dev_dataset,
@@ -342,6 +404,7 @@ if __name__ == '__main__':
     logger.info('-' * 100)
     logger.info('Starting training...')
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
+    best_acc = 0
     for epoch in range(0, args.epochs):
         stats['epoch'] = epoch
         train_loss = utils.AverageMeter()
@@ -350,20 +413,19 @@ if __name__ == '__main__':
         for idx, ex in enumerate(train_loader):
             train_loss.update(*model.update(ex))
 
-            logger.info('train: Epoch = %d | iter = %d/%d | ' %
-                        (stats['epoch'], idx, len(train_loader)) +
-                        'loss = %.2f | elapsed time = %.2f (s)' %
-                        (train_loss.avg, stats['timer'].time()))
-            train_loss.reset()
+            if idx % 100 == 0:
+                logger.info('epoch: %d, iter = %d/%d | ' %
+                            (stats['epoch'], idx, len(train_loader)) +
+                            'loss = %.2f, elapsed time = %.2f (s)' %
+                            (train_loss.avg, stats['timer'].time()))
+                train_loss.reset()
 
-        logger.info('train: Epoch %d done. Time for epoch = %.2f (s)' %
-                    (stats['epoch'], epoch_time.time()))
-
-        # TODO: validation accuracy and checkpointing
-        # Validate unofficial (train)
-        # validate_unofficial(args, train_loader, model, stats, mode='train')
-
-    # Checkpoint
-    # if args.checkpoint:
-    #     model.checkpoint(args.model_file + '.checkpoint',
-    #                      global_stats['epoch'] + 1)
+        train_acc = model.eval(train_loader, mode='train')
+        dev_acc = model.eval(dev_loader)
+        if dev_acc > best_acc:
+            best_acc = dev_acc
+            model.save(args.model_file)
+        logger.info('Epoch %d took %.2f (s), train acc: %.2f, dev acc: %.2f '
+                    % (stats['epoch'], epoch_time.time(), train_acc, dev_acc))
+        if args.checkpoint:
+            model.checkpoint(args.model_file + '.checkpoint', epoch + 1)
