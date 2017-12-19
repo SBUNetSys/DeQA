@@ -24,6 +24,8 @@ if __name__ == '__main__':
     record_path = os.path.splitext(args.record_file)[0] + '.txt'
     answer_file = args.answer_file
     prediction_file = args.prediction_file
+    max_q_len = 0
+    max_p_len = 0
     with open(record_path, 'w') as f:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
@@ -52,6 +54,9 @@ if __name__ == '__main__':
                 record['stop'] = 1 if exact_match else 0
 
                 record['q_idx'] = q_feature['idx']
+                if len(q_feature['idx']) > max_q_len:
+                    max_q_len = len(q_feature['idx'])
+
                 record['q_tf'] = q_feature['tf']
                 record['q_ner'] = q_feature['ner']
                 record['q_pos'] = q_feature['pos']
@@ -59,15 +64,14 @@ if __name__ == '__main__':
                 s = entry['start']
                 e = entry['end']
                 record['a_loc'] = [int(s), int(e)]
+                record['doc_id'] = doc_id
+
                 doc_path = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
                 if os.path.exists(doc_path):
                     doc_data = open(doc_path, encoding=ENCODING).read()
                     feature = json.loads(doc_data)
-                    record['p_idx'] = feature['idx']
-                    record['p_tf'] = feature['tf']
-                    record['p_ner'] = feature['ner']
-                    record['p_pos'] = feature['pos']
-
+                    if len(feature['idx']) > max_p_len:
+                        max_p_len = len(feature['idx'])
                     # a_idx = feature['idx'][int(s):int(e) + 1]
                     # record['a_idx'] = a_idx
                 else:
@@ -75,6 +79,8 @@ if __name__ == '__main__':
                     doc_missing_count += 1
                 f.write(json.dumps(record, sort_keys=True) + '\n')
                 no += 1
-                print('processed %d records...' % no)
+                if no % 100 == 0:
+                    print('processed %d records...' % no)
 
+    print('max_q_len:', max_q_len, 'max_p_len:', max_p_len)
     print('%d docs not found' % doc_missing_count)
