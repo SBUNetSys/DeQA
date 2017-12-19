@@ -12,6 +12,7 @@ from torch.utils.data.sampler import Sampler
 from torch.autograd import Variable
 import logging
 import time
+import gc
 from drqa.tokenizers.tokenizer import Tokenizer
 from drqa.reader import utils
 from drqa.pipeline import DEFAULTS
@@ -33,7 +34,7 @@ class EarlyStoppingClassifier(nn.Module):
         self.linear = nn.Linear(DIM, NUM_CLASS)
 
     def forward(self, input_):
-        return F.log_softmax(self.linear(input_))
+        return F.log_softmax(self.linear(input_), dim=0)
 
 
 class EarlyStoppingModel(object):
@@ -102,7 +103,7 @@ class EarlyStoppingModel(object):
         _, pred = torch.max(score, dim)
         return pred
 
-    def eval(self, data_loader_, mode='dev'):
+    def eval(self, data_loader_):
         total = 0
         correct = 0
         for batch_ in data_loader_:
@@ -112,8 +113,8 @@ class EarlyStoppingModel(object):
             labels_ = batch_[1]
             correct += (preds_.numpy() == labels_.numpy()).sum()
 
-            # If getting train accuracies, sample max 10k
-            if mode == 'train' and total >= 1e4:
+            # sample max 10k
+            if total >= 1e4:
                 break
         return correct / total * 100
 
@@ -328,7 +329,7 @@ if __name__ == '__main__':
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
     parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
-    parser.add_argument('--data_workers', type=int, default=5,
+    parser.add_argument('--data_workers', type=int, default=os.cpu_count()/2,
                         help='Number of subprocesses for data loading')
     parser.add_argument('--parallel', action='store_true',
                         help='Use DataParallel on all available GPUs')
@@ -347,6 +348,8 @@ if __name__ == '__main__':
                         help='Gradient clipping')
     parser.add_argument('--weight_decay', type=float, default=0,
                         help='Weight decay factor')
+    parser.add_argument('--split_ratio', type=float, default=0.9,
+                        help='ratio of train/dev')
     parser.add_argument('--momentum', type=float, default=0,
                         help='Momentum factor')
     parser.add_argument('--model_file', type=str, default=DEFAULTS['linear_model'],
@@ -374,7 +377,7 @@ if __name__ == '__main__':
         record = json.loads(data_line)
         records.append(record)
 
-    divider = int(0.9 * len(records))
+    divider = int(args.split_ratio * len(records))
     train_dataset = RecordDataset(records[:divider], has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
@@ -401,7 +404,7 @@ if __name__ == '__main__':
 
     # --------------------------------------------------------------------------
     # TRAIN/VALID LOOP
-    logger.info('-' * 100)
+    logger.info('-' * 50)
     logger.info('Starting training...')
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
     best_acc = 0
@@ -419,8 +422,9 @@ if __name__ == '__main__':
                             'loss = %.2f, elapsed time = %.2f (s)' %
                             (train_loss.avg, stats['timer'].time()))
                 train_loss.reset()
+                gc.collect()
 
-        train_acc = model.eval(train_loader, mode='train')
+        train_acc = model.eval(train_loader)
         dev_acc = model.eval(dev_loader)
         if dev_acc > best_acc:
             best_acc = dev_acc
