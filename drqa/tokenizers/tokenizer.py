@@ -86,6 +86,7 @@ class Tokens(object):
               True or False to keep or not keep the ngram
             as_strings: return the ngram as a string vs list
         """
+
         def _skip(gram):
             if not filter_fn:
                 return False
@@ -140,6 +141,8 @@ class Tokenizer(object):
            'PRP', 'NNS', 'VBN', '``', 'NNPS', "''", 'TO', 'WRB', 'VBD', 'CD', '-LRB-',
            'WDT', '-RRB-', 'RBS', 'VBP', 'VB', 'JJS', ':', 'PRP$', 'WP', 'JJR', '$', 'RP',
            'MD', 'EX', '#', 'RBR', 'FW', 'WP$', 'UH', 'PDT', 'SYM', 'LS']
+    NER_DICT = {f: i for i, f in enumerate(NER)}
+    POS_DICT = {f: i for i, f in enumerate(POS)}
 
     def tokenize(self, text):
         raise NotImplementedError
