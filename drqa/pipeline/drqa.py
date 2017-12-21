@@ -304,6 +304,10 @@ class DrQA(object):
         result_handles = []
         num_loaders = min(self.max_loaders, math.floor(len(examples) / 1e3))
         for batch in self._get_loader(examples, num_loaders):
+            q_id = slugify(queries[0])
+            (qidx, rel_didx, _) = batch[-1][0]
+            doc_id = all_docids[qidx][rel_didx]
+            qa_id = (q_id, doc_id)
             if candidates or self.fixed_candidates:
                 batch_cands = []
                 for ex_id in batch[-1]:
@@ -313,7 +317,7 @@ class DrQA(object):
                     })
                 handle = self.reader.predict(batch, batch_cands, async_pool=self.processes)
             else:
-                handle = self.reader.predict(batch, async_pool=self.processes)
+                handle = self.reader.predict(batch, async_pool=self.processes, q_a_id=qa_id)
 
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 

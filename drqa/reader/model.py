@@ -11,7 +11,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 import copy
-
+from ..pipeline import DEFAULTS
 from torch.autograd import Variable
 from .config import override_model_args
 from .rnn_reader import RnnDocReader
@@ -254,7 +254,7 @@ class DocReader(object):
     # Prediction
     # --------------------------------------------------------------------------
 
-    def predict(self, ex, candidates=None, top_n=1, async_pool=None):
+    def predict(self, ex, candidates=None, top_n=1, async_pool=None, q_a_id=None):
         """Forward a batch of examples only to get predictions.
 
         Args:
@@ -285,7 +285,15 @@ class DocReader(object):
         t2 = time.time()
         logger.debug('input processing [time]: %.4f s' % (t2 - t1))
         # Run forward
-        score_s, score_e = self.network(*inputs)
+        score_s, score_e, q_hidden, doc_hidden = self.network(*inputs)
+
+        if q_a_id:
+            import numpy as np
+            q_id, doc_id = q_a_id
+            q_path = DEFAULTS['features'] + q_id
+            doc_path = DEFAULTS['features'] + doc_id
+            np.savez_compressed(q_path, q_hidden=q_hidden.data.numpy())
+            np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.numpy())
 
         # Decode predictions
         score_s = score_s.data.cpu()
