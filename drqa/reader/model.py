@@ -292,8 +292,8 @@ class DocReader(object):
             q_id, doc_id = q_a_id
             q_path = DEFAULTS['features'] + q_id
             doc_path = DEFAULTS['features'] + doc_id
-            np.savez_compressed(q_path, q_hidden=q_hidden.data.numpy())
-            np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.numpy())
+            np.savez_compressed(q_path, q_hidden=q_hidden.data.cpu().numpy())
+            np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.cpu().numpy())
 
         # Decode predictions
         score_s = score_s.data.cpu()
