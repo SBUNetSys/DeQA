@@ -10,6 +10,7 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
+import os
 import copy
 from ..pipeline import DEFAULTS
 from torch.autograd import Variable
@@ -17,6 +18,7 @@ from .config import override_model_args
 from .rnn_reader import RnnDocReader
 import logging
 import time
+
 logger = logging.getLogger(__name__)
 
 
@@ -288,12 +290,13 @@ class DocReader(object):
         score_s, score_e, q_hidden, doc_hidden = self.network(*inputs)
 
         if q_a_id:
-            import numpy as np
             q_id, doc_id = q_a_id
             q_path = DEFAULTS['features'] + q_id
             doc_path = DEFAULTS['features'] + doc_id
-            np.savez_compressed(q_path, q_hidden=q_hidden.data.cpu().numpy())
-            np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.cpu().numpy())
+            if not os.path.exists(q_path + '.npz'):
+                np.savez_compressed(q_path, q_hidden=q_hidden.data.cpu().numpy())
+            if not os.path.exists(q_path + '.npz'):
+                np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.cpu().numpy())
 
         # Decode predictions
         score_s = score_s.data.cpu()
