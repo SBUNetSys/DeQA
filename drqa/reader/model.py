@@ -16,6 +16,7 @@ from ..pipeline import DEFAULTS
 from torch.autograd import Variable
 from .config import override_model_args
 from .rnn_reader import RnnDocReader
+from . import layers
 import logging
 import time
 
@@ -289,18 +290,6 @@ class DocReader(object):
         # Run forward
         score_s, score_e, q_hiddens, doc_hiddens = self.network(*inputs)
 
-        if q_a_id:
-            q_ids, doc_ids = q_a_id
-            q_hiddens = q_hiddens.data.cpu().numpy()
-            doc_hiddens = doc_hiddens.data.cpu().numpy()
-            for q_id, doc_id, q_hidden, doc_hidden in zip(q_ids, doc_ids, q_hiddens, doc_hiddens):
-                q_path = DEFAULTS['features'] + q_id
-                doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
-                if not os.path.exists(q_path + '.npz'):
-                    np.savez_compressed(q_path, q_hidden=q_hidden)
-                if not os.path.exists(doc_path + '.npz'):
-                    np.savez_compressed(doc_path, doc_hidden=doc_hidden)
-
         # Decode predictions
         score_s = score_s.data.cpu()
         score_e = score_e.data.cpu()
@@ -311,14 +300,14 @@ class DocReader(object):
             else:
                 return self.decode_candidates(*args)
         else:
-            args = (score_s, score_e, top_n, self.args.max_len)
+            args = (score_s, score_e, top_n, self.args.max_len, q_a_id, q_hiddens, doc_hiddens, inputs[2])
             if async_pool:
                 return async_pool.apply_async(self.decode, args)
             else:
                 return self.decode(*args)
 
     @staticmethod
-    def decode(score_s, score_e, top_n=1, max_len=None):
+    def decode(score_s, score_e, top_n=1, max_len=None, f_id=None, q_h=None, doc_h=None, d_mask=None):
         """Take argmax of constrained score_s * score_e.
 
         Args:
@@ -331,6 +320,15 @@ class DocReader(object):
         pred_e = []
         pred_score = []
         max_len = max_len or score_s.size(1)
+        if f_id:
+            q_ids, doc_ids = f_id
+            q_hiddens = q_h.data.cpu().numpy()
+            doc_hiddens = doc_h.data.cpu().numpy()
+        else:
+            q_ids, doc_ids = [], []
+            q_hiddens = []
+            doc_hiddens = []
+
         t1 = time.time()
         for i in range(score_s.size(0)):
             # Outer product of scores to get full p_s * p_e matrix
@@ -353,6 +351,22 @@ class DocReader(object):
             pred_s.append(s_idx)
             pred_e.append(e_idx)
             pred_score.append(scores_flat[idx_sort])
+
+            if q_ids:
+                q_id, doc_id, q_hidden, doc_hidden = q_ids[i], doc_ids[i], q_hiddens[i], doc_hiddens[i]
+                q_path = DEFAULTS['features'] + q_id
+                doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
+                if not os.path.exists(q_path + '.npz'):
+                    np.savez_compressed(q_path, q_hidden=q_hidden)
+                if not os.path.exists(doc_path + '.npz'):
+                    d_merge_weights = layers.uniform_weights(doc_hidden, d_mask)
+                    doc_h = layers.weighted_avg(doc_hidden, d_merge_weights)
+                    ans_hidden = doc_hidden[s_idx[0]:e_idx[0] + 1]
+                    a_mask = d_mask[s_idx[0]:e_idx[0] + 1]
+                    a_merge_weights = layers.uniform_weights(ans_hidden, a_mask)
+                    ans_h = layers.weighted_avg(ans_hidden, a_merge_weights)
+                    np.savez_compressed(doc_path, doc_hidden=doc_h, ans_hidden=ans_h)
+
         t2 = time.time()
         logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
         return pred_s, pred_e, pred_score

@@ -154,6 +154,4 @@ class RnnDocReader(nn.Module):
         t11 = time.time()
         logger.debug('end_attn [time]: %.4f s' % (t11 - t10))
 
-        d_merge_weights = layers.uniform_weights(doc_hiddens, x1_mask)
-        doc_hidden = layers.weighted_avg(doc_hiddens, d_merge_weights)
-        return start_scores, end_scores, question_hidden, doc_hidden
+        return start_scores, end_scores, question_hidden, doc_hiddens
