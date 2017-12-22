@@ -295,7 +295,7 @@ class DocReader(object):
             doc_path = DEFAULTS['features'] + doc_id
             if not os.path.exists(q_path + '.npz'):
                 np.savez_compressed(q_path, q_hidden=q_hidden.data.cpu().numpy())
-            if not os.path.exists(q_path + '.npz'):
+            if not os.path.exists(doc_path + '.npz'):
                 np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.cpu().numpy())
 
         # Decode predictions
