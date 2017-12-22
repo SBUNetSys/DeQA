@@ -295,7 +295,7 @@ class DocReader(object):
             doc_hiddens = doc_hiddens.data.cpu().numpy()
             for q_id, doc_id, q_hidden, doc_hidden in zip(q_ids, doc_ids, q_hiddens, doc_hiddens):
                 q_path = DEFAULTS['features'] + q_id
-                doc_path = DEFAULTS['features'] + doc_id
+                doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
                 if not os.path.exists(q_path + '.npz'):
                     np.savez_compressed(q_path, q_hidden=q_hidden)
                 if not os.path.exists(doc_path + '.npz'):
