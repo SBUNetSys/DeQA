@@ -287,16 +287,19 @@ class DocReader(object):
         t2 = time.time()
         logger.debug('input processing [time]: %.4f s' % (t2 - t1))
         # Run forward
-        score_s, score_e, q_hidden, doc_hidden = self.network(*inputs)
+        score_s, score_e, q_hiddens, doc_hiddens = self.network(*inputs)
 
         if q_a_id:
-            q_id, doc_id = q_a_id
-            q_path = DEFAULTS['features'] + q_id
-            doc_path = DEFAULTS['features'] + doc_id
-            if not os.path.exists(q_path + '.npz'):
-                np.savez_compressed(q_path, q_hidden=q_hidden.data.cpu().numpy())
-            if not os.path.exists(doc_path + '.npz'):
-                np.savez_compressed(doc_path, doc_hidden=doc_hidden.data.cpu().numpy())
+            q_ids, doc_ids = q_a_id
+            q_hiddens = q_hiddens.data.cpu().numpy()
+            doc_hiddens = doc_hiddens.data.cpu().numpy()
+            for q_id, doc_id, q_hidden, doc_hidden in zip(q_ids, doc_ids, q_hiddens, doc_hiddens):
+                q_path = DEFAULTS['features'] + q_id
+                doc_path = DEFAULTS['features'] + doc_id
+                if not os.path.exists(q_path + '.npz'):
+                    np.savez_compressed(q_path, q_hidden=q_hidden)
+                if not os.path.exists(doc_path + '.npz'):
+                    np.savez_compressed(doc_path, doc_hidden=doc_hidden)
 
         # Decode predictions
         score_s = score_s.data.cpu()

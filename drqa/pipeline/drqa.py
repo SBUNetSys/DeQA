@@ -304,10 +304,9 @@ class DrQA(object):
         result_handles = []
         num_loaders = min(self.max_loaders, math.floor(len(examples) / 1e3))
         for batch in self._get_loader(examples, num_loaders):
-            q_id = slugify(queries[0])
-            (qidx, rel_didx, _) = batch[-1][0]
-            doc_id = all_docids[qidx][rel_didx]
-            qa_id = (q_id, doc_id)
+            q_ids = [slugify(query) for query in queries]
+            doc_ids = [all_docids[qidx][rel_didx] for qidx, rel_didx, _ in batch[-1]]
+            qa_id = (q_ids, doc_ids)
             if candidates or self.fixed_candidates:
                 batch_cands = []
                 for ex_id in batch[-1]:
