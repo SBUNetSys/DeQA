@@ -322,12 +322,13 @@ class DocReader(object):
         max_len = max_len or score_s.size(1)
         if f_id:
             q_ids, doc_ids = f_id
-            q_hiddens = q_h.data.cpu().numpy()
-            doc_hiddens = doc_h.data.cpu().numpy()
+            q_h = q_h.data.cpu().numpy()
+            doc_h = doc_h.data.cpu().numpy()
+            d_mask = d_mask.data.cpu().numpy()
         else:
             q_ids, doc_ids = [], []
-            q_hiddens = []
-            doc_hiddens = []
+            q_h = []
+            doc_h = []
 
         t1 = time.time()
         for i in range(score_s.size(0)):
@@ -353,19 +354,20 @@ class DocReader(object):
             pred_score.append(scores_flat[idx_sort])
 
             if q_ids:
-                q_id, doc_id, q_hidden, doc_hidden = q_ids[i], doc_ids[i], q_hiddens[i], doc_hiddens[i]
+                q_id, doc_id, q_hidden, doc_hidden = q_ids[i], doc_ids[i], q_h[i], doc_h[i]
                 q_path = DEFAULTS['features'] + q_id
                 doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
                 if not os.path.exists(q_path + '.npz'):
                     np.savez_compressed(q_path, q_hidden=q_hidden)
                 if not os.path.exists(doc_path + '.npz'):
-                    d_merge_weights = layers.uniform_weights(doc_hidden, d_mask)
-                    doc_h = layers.weighted_avg(doc_hidden, d_merge_weights)
+                    d_merge_weights = layers.np_uniform_weights(doc_hidden, d_mask)
+                    doc_hi = layers.np_weighted_avg(doc_hidden, d_merge_weights)
                     ans_hidden = doc_hidden[s_idx[0]:e_idx[0] + 1]
                     a_mask = d_mask[s_idx[0]:e_idx[0] + 1]
-                    a_merge_weights = layers.uniform_weights(ans_hidden, a_mask)
-                    ans_h = layers.weighted_avg(ans_hidden, a_merge_weights)
-                    np.savez_compressed(doc_path, doc_hidden=doc_h, ans_hidden=ans_h)
+                    a_merge_weights = layers.np_uniform_weights(ans_hidden, a_mask)
+                    ans_h = layers.np_weighted_avg(ans_hidden, a_merge_weights)
+                    np.savez_compressed(doc_path, doc_hidden=doc_hi,
+                                        ans_hidden=ans_h)
 
         t2 = time.time()
         logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
@@ -463,9 +465,9 @@ class DocReader(object):
         feature_dict = saved_params['feature_dict']
         state_dict = saved_params['state_dict']
         args = saved_params['args']
-        args.use_lemma = True
-        args.use_ner = True
-        args.use_pos = True
+        # args.use_lemma = True
+        # args.use_ner = True
+        # args.use_pos = True
         if new_args:
             args = override_model_args(args, new_args)
         return DocReader(args, word_dict, feature_dict, state_dict, normalize)
