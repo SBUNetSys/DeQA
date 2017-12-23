@@ -306,17 +306,10 @@ def uniform_weights(x, x_mask):
 
 
 def np_uniform_weights(x, x_mask):
-    """Return uniform weights over non-masked x (a sequence of vectors).
 
-    Args:
-        x: batch * len * hdim
-        x_mask: batch * len (1 for padding, 0 for true)
-    Output:x_mask.data.numpy().shape[:2](np.equal(x_mask.data.numpy(), 0) * 1.0).sum(1, keepdims=True)
-        x_avg: batch * hdim
-    """
     import numpy as np
     alpha = np.equal(x_mask, 0) * 1.0
-    alpha = alpha / alpha.sum(1, keepdims=True).repeat(alpha.shape[1], axis=1)
+    alpha = alpha / alpha.sum()
     return alpha
 
 
@@ -333,14 +326,5 @@ def weighted_avg(x, weights):
 
 
 def np_weighted_avg(x, weights):
-    """Return a weighted average of x (a sequence of vectors).
-
-    Args:
-        x: batch * len * hdim
-        weights: batch * len, sum(dim = 1) = 1
-    Output:
-        x_avg: batch * hdim
-    """
     import numpy as np
-    avg = np.expand_dims(weights, 1) @ x
-    return avg.squeeze(1)
+    return np.expand_dims(weights, 0).dot(x)

@@ -307,7 +307,7 @@ class DocReader(object):
                 return self.decode(*args)
 
     @staticmethod
-    def decode(score_s, score_e, top_n=1, max_len=None, f_id=None, q_h=None, doc_h=None, d_mask=None):
+    def decode(score_s, score_e, top_n=1, max_len=None, f_id=None, q_h=None, doc_h=None, mask=None):
         """Take argmax of constrained score_s * score_e.
 
         Args:
@@ -324,7 +324,7 @@ class DocReader(object):
             q_ids, doc_ids = f_id
             q_h = q_h.data.cpu().numpy()
             doc_h = doc_h.data.cpu().numpy()
-            d_mask = d_mask.data.cpu().numpy()
+            mask = mask.data.cpu().numpy()
         else:
             q_ids, doc_ids = [], []
             q_h = []
@@ -354,7 +354,7 @@ class DocReader(object):
             pred_score.append(scores_flat[idx_sort])
 
             if q_ids:
-                q_id, doc_id, q_hidden, doc_hidden = q_ids[i], doc_ids[i], q_h[i], doc_h[i]
+                q_id, doc_id, q_hidden, doc_hidden, d_mask = q_ids[i], doc_ids[i], q_h[i], doc_h[i], mask[i]
                 q_path = DEFAULTS['features'] + q_id
                 doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
                 if not os.path.exists(q_path + '.npz'):
