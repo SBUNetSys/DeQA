@@ -293,6 +293,10 @@ class DocReader(object):
         # Decode predictions
         score_s = score_s.data.cpu()
         score_e = score_e.data.cpu()
+        q_hiddens = q_hiddens.data.cpu()
+        doc_hiddens = doc_hiddens.data.cpu()
+        doc_mask = inputs[2]
+        doc_mask = doc_mask.data.cpu()
         if candidates:
             args = (score_s, score_e, candidates, top_n, self.args.max_len)
             if async_pool:
@@ -300,7 +304,7 @@ class DocReader(object):
             else:
                 return self.decode_candidates(*args)
         else:
-            args = (score_s, score_e, top_n, self.args.max_len, q_a_id, q_hiddens, doc_hiddens, inputs[2])
+            args = (score_s, score_e, top_n, self.args.max_len, q_a_id, q_hiddens, doc_hiddens, doc_mask)
             if async_pool:
                 return async_pool.apply_async(self.decode, args)
             else:
@@ -322,9 +326,9 @@ class DocReader(object):
         max_len = max_len or score_s.size(1)
         if f_id:
             q_ids, doc_ids = f_id
-            q_h = q_h.data.cpu().numpy()
-            doc_h = doc_h.data.cpu().numpy()
-            mask = mask.data.cpu().numpy()
+            q_h = q_h.numpy()
+            doc_h = doc_h.numpy()
+            mask = mask.numpy()
         else:
             q_ids, doc_ids = [], []
             q_h = []
