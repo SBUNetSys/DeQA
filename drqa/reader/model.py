@@ -357,8 +357,13 @@ class DocReader(object):
             pred_e.append(e_idx)
             pred_score.append(scores_flat[idx_sort])
 
-            if q_ids:
-                q_id, doc_id, q_hidden, doc_hidden, d_mask = q_ids[i], doc_ids[i], q_h[i], doc_h[i], mask[i]
+            if i < len(q_ids):
+                q_id = q_ids[i]
+                doc_id = doc_ids[i]
+                q_hidden = q_h[i]
+                doc_hidden = doc_h[i]
+                d_mask = mask[i]
+
                 q_path = DEFAULTS['features'] + q_id
                 doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
                 if not os.path.exists(q_path + '.npz'):
