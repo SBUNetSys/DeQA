@@ -135,7 +135,10 @@ class DrQA(object):
             tok_class = tokenizers.get_class(tokenizer)
 
         logger.debug('annotators')
-        annotators = tokenizers.get_annotators_for_model(self.reader)
+        annotators = set()
+        annotators.add('pos')
+        annotators.add('ner')
+        # annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
         self.num_workers = num_workers
@@ -276,6 +279,7 @@ class DrQA(object):
                             'lemma': s_tokens[sidx].lemmas(),
                             'pos': s_tokens[sidx].pos(),
                             'ner': s_tokens[sidx].entities(),
+                            'doc_score': float(all_doc_scores[qidx][rel_didx])
                         })
                         para_lens.append(len(s_tokens[sidx].words()))
 

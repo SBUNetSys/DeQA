@@ -99,7 +99,7 @@ class ReaderDataset(Dataset):
         return vectorize(self.examples[index], self.model, self.single_answer)
 
     def lengths(self):
-        return [(len(ex['document']), len(ex['question']))
+        return [(ex['doc_score'], len(ex['document']), len(ex['question']))
                 for ex in self.examples]
 
 
