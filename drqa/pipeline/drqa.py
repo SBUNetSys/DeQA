@@ -135,10 +135,7 @@ class DrQA(object):
             tok_class = tokenizers.get_class(tokenizer)
 
         logger.debug('annotators')
-        annotators = set()
-        annotators.add('pos')
-        annotators.add('ner')
-        # annotators = tokenizers.get_annotators_for_model(self.reader)
+        annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
         self.num_workers = num_workers
@@ -246,81 +243,59 @@ class DrQA(object):
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.
         examples = []
-        for qidx in range(len(queries)):
-            word_dict = self.reader.word_dict
-            q_text = q_tokens[qidx].words()
-            q_id = slugify(queries[qidx])
-            q_feat_file = os.path.join(DEFAULTS['features'], '%s.json' % q_id)
-            if not os.path.exists(q_feat_file):
-                para_length = len(q_text)
-                counter = Counter(q_text)
-                tf = [round(counter[w] * 1.0 / para_length, 6) for w in q_text]
-                idx = [word_dict[w] for w in q_text]
-                record = {
-                    'idx': idx,
-                    'pos': q_tokens[qidx].pos(),
-                    'ner': q_tokens[qidx].entities(),
-                    'tf': tf
-                }
-                with open(q_feat_file, 'w') as f:
-                    f.write(json.dumps(record, sort_keys=True))
+        q_text = q_tokens[0].words()
+        q_id = slugify(queries[0])
+        q_feat_file = os.path.join(DEFAULTS['features'], '%s.json' % q_id)
+        if os.path.exists(q_feat_file):
+            record = json.load(open(q_feat_file))
+            q_pos = record['pos']
+            q_ner = record['ner']
+        else:
+            q_pos = None
+            q_ner = None
+            logger.warning('no ner and pos file: %s' % q_feat_file)
+            return []
 
-            para_lens = []
-            for rel_didx, did in enumerate(all_docids[qidx]):
-                start, end = didx2sidx[did2didx[did]]
-                for sidx in range(start, end):
-                    para_text = s_tokens[sidx].words()
-                    if len(q_text) > 0 and len(para_text) > 0:
-                        examples.append({
-                            'id': (qidx, rel_didx, sidx),
-                            'question': q_text,
-                            'qlemma': q_tokens[qidx].lemmas(),
-                            'document': para_text,
-                            'lemma': s_tokens[sidx].lemmas(),
-                            'pos': s_tokens[sidx].pos(),
-                            'ner': s_tokens[sidx].entities(),
-                            'doc_score': float(all_doc_scores[qidx][rel_didx])
-                        })
-                        para_lens.append(len(s_tokens[sidx].words()))
+        para_lens = []
+        p_pos = []
+        p_ner = []
+        for rel_didx, did in enumerate(all_docids[0]):
+            start, end = didx2sidx[did2didx[did]]
+            for sidx in range(start, end):
+                para_text = s_tokens[sidx].words()
+                if len(q_text) > 0 and len(para_text) > 0:
+                    examples.append({
+                        'id': (0, rel_didx, sidx),
+                        'question': q_text,
+                        'qlemma': q_tokens[0].lemmas(),
+                        'document': para_text,
+                        'lemma': s_tokens[sidx].lemmas(),
+                        'doc_score': float(all_doc_scores[0][rel_didx])
+                    })
+                    para_lens.append(len(para_text))
 
-                        feat_file = os.path.join(DEFAULTS['features'], '%s.json' % did)
-                        if not os.path.exists(feat_file):
-                            para_length = len(para_text)
-                            counter = Counter(para_text)
-                            tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
-                            idx = [word_dict[w] for w in para_text]
+                    feat_file = os.path.join(DEFAULTS['features'], '%s.json' % did)
+                    if os.path.exists(feat_file):
+                        record = json.load(open(q_feat_file))
+                        p_pos.append(record['pos'])
+                        p_ner.append(record['ner'])
+                    else:
+                        logger.warning('no ner and pos file: %s' % feat_file)
 
-                            record = {
-                                'pos': s_tokens[sidx].pos(),
-                                'ner': s_tokens[sidx].entities(),
-                                'tf': tf,
-                                'idx': idx
-                            }
-                            with open(feat_file, 'w') as f:
-                                f.write(json.dumps(record, sort_keys=True))
-
-            logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
+            logger.debug('question_p: %s paragraphs: %s' % (queries[0], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
 
         # Push all examples through the document reader.
         # We decode argmax start/end indices asychronously on CPU.
         result_handles = []
-        num_loaders = min(self.max_loaders, math.floor(len(examples) / 1e3))
+        num_loaders = min(self.max_loaders, int(math.floor(len(examples) / 1e3)))
         for batch in self._get_loader(examples, num_loaders):
-            q_ids = [slugify(query) for query in queries]
-            doc_ids = [all_docids[qidx][rel_didx] for qidx, rel_didx, _ in batch[-1]]
-            qa_id = (q_ids, doc_ids)
-            if candidates or self.fixed_candidates:
-                batch_cands = []
-                for ex_id in batch[-1]:
-                    batch_cands.append({
-                        'input': s_tokens[ex_id[2]],
-                        'cands': candidates[ex_id[0]] if candidates else None
-                    })
-                handle = self.reader.predict(batch, batch_cands, async_pool=self.processes)
-            else:
-                handle = self.reader.predict(batch, async_pool=self.processes, q_a_id=qa_id)
+            q_id = slugify(queries[0])
+            doc_id = all_docids[0][batch[-1][2]]
+            qa_id = (q_id, doc_id)
+
+            handle = self.reader.predict(batch, async_pool=self.processes)
 
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 
