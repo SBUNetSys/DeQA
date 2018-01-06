@@ -257,7 +257,7 @@ class DocReader(object):
     # Prediction
     # --------------------------------------------------------------------------
 
-    def predict(self, ex, candidates=None, top_n=1, async_pool=None, q_a_id=None):
+    def predict(self, ex, candidates=None, top_n=1, async_pool=None):
         """Forward a batch of examples only to get predictions.
 
         Args:
@@ -304,14 +304,14 @@ class DocReader(object):
             else:
                 return self.decode_candidates(*args)
         else:
-            args = (score_s, score_e, top_n, self.args.max_len, q_a_id, q_hiddens, doc_hiddens, doc_mask)
+            args = (score_s, score_e, top_n, self.args.max_len, q_hiddens, doc_hiddens, doc_mask)
             if async_pool:
                 return async_pool.apply_async(self.decode, args)
             else:
                 return self.decode(*args)
 
     @staticmethod
-    def decode(score_s, score_e, top_n=1, max_len=None, f_id=None, q_h=None, doc_h=None, mask=None):
+    def decode(score_s, score_e, top_n=1, max_len=None, q_h=None, doc_h=None, mask=None):
         """Take argmax of constrained score_s * score_e.
 
         Args:
@@ -320,67 +320,43 @@ class DocReader(object):
             top_n: number of top scored pairs to take
             max_len: max span length to consider
         """
-        pred_s = []
-        pred_e = []
-        pred_score = []
+
         max_len = max_len or score_s.size(1)
-        if f_id:
-            q_ids, doc_ids = f_id
-            q_h = q_h.numpy()
-            doc_h = doc_h.numpy()
-            mask = mask.numpy()
-        else:
-            q_ids, doc_ids = [], []
-            q_h = []
-            doc_h = []
-
         t1 = time.time()
-        for i in range(score_s.size(0)):
-            # Outer product of scores to get full p_s * p_e matrix
-            scores = torch.ger(score_s[i], score_e[i])
+        # Outer product of scores to get full p_s * p_e matrix
+        scores = torch.ger(score_s[0], score_e[0])
 
-            # Zero out negative length and over-length span scores
-            scores.triu_().tril_(max_len - 1)
+        # Zero out negative length and over-length span scores
+        scores.triu_().tril_(max_len - 1)
 
-            # Take argmax or top n
-            scores = scores.numpy()
-            scores_flat = scores.flatten()
-            if top_n == 1:
-                idx_sort = [np.argmax(scores_flat)]
-            elif len(scores_flat) < top_n:
-                idx_sort = np.argsort(-scores_flat)
-            else:
-                idx = np.argpartition(-scores_flat, top_n)[0:top_n]
-                idx_sort = idx[np.argsort(-scores_flat[idx])]
-            s_idx, e_idx = np.unravel_index(idx_sort, scores.shape)
-            pred_s.append(s_idx)
-            pred_e.append(e_idx)
-            pred_score.append(scores_flat[idx_sort])
+        # Take argmax or top n
+        scores = scores.numpy()
+        scores_flat = scores.flatten()
+        if top_n == 1:
+            idx_sort = [np.argmax(scores_flat)]
+        elif len(scores_flat) < top_n:
+            idx_sort = np.argsort(-scores_flat)
+        else:
+            idx = np.argpartition(-scores_flat, top_n)[0:top_n]
+            idx_sort = idx[np.argsort(-scores_flat[idx])]
+        s_idx, e_idx = np.unravel_index(idx_sort, scores.shape)
+        pred_s = s_idx[0]
+        pred_e = e_idx[0]
+        pred_score = float(scores_flat[idx_sort][0])
 
-            if i < len(q_ids):
-                q_id = q_ids[i]
-                doc_id = doc_ids[i]
-                q_hidden = q_h[i]
-                doc_hidden = doc_h[i]
-                d_mask = mask[i]
-
-                q_path = DEFAULTS['features'] + q_id
-                doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
-                if not os.path.exists(q_path + '.npz'):
-                    np.savez_compressed(q_path, q_hidden=q_hidden)
-                if not os.path.exists(doc_path + '.npz'):
-                    d_merge_weights = layers.np_uniform_weights(doc_hidden, d_mask)
-                    doc_hi = layers.np_weighted_avg(doc_hidden, d_merge_weights)
-                    ans_hidden = doc_hidden[s_idx[0]:e_idx[0] + 1]
-                    a_mask = d_mask[s_idx[0]:e_idx[0] + 1]
-                    a_merge_weights = layers.np_uniform_weights(ans_hidden, a_mask)
-                    ans_h = layers.np_weighted_avg(ans_hidden, a_merge_weights)
-                    np.savez_compressed(doc_path, doc_hidden=doc_hi,
-                                        ans_hidden=ans_h)
+        q_hidden = q_h.numpy()
+        doc_hidden = np.squeeze(doc_h.numpy())
+        d_mask = np.squeeze(mask.numpy())
+        d_merge_weights = layers.np_uniform_weights(doc_hidden, d_mask)
+        p_hidden = layers.np_weighted_avg(doc_hidden, d_merge_weights)
+        ans_hidden = doc_hidden[s_idx[0]:e_idx[0] + 1]
+        a_mask = d_mask[s_idx[0]:e_idx[0] + 1]
+        a_merge_weights = layers.np_uniform_weights(ans_hidden, a_mask)
+        a_hidden = layers.np_weighted_avg(ans_hidden, a_merge_weights)
 
         t2 = time.time()
         logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
-        return pred_s, pred_e, pred_score
+        return pred_s, pred_e, pred_score, np.squeeze(q_hidden), np.squeeze(p_hidden), np.squeeze(a_hidden)
 
     @staticmethod
     def decode_candidates(score_s, score_e, candidates, top_n=1, max_len=None):

@@ -20,6 +20,7 @@ from ..reader.vector import batchify
 from ..reader.data import ReaderDataset, SortedBatchSampler
 from .. import reader
 from .. import tokenizers
+from ..tokenizers.tokenizer import Tokenizer
 from . import DEFAULTS
 import logging
 from ..reader.utils import slugify
@@ -246,26 +247,27 @@ class DrQA(object):
         q_text = q_tokens[0].words()
         q_id = slugify(queries[0])
         q_feat_file = os.path.join(DEFAULTS['features'], '%s.json' % q_id)
+        n_q = [0 for _ in Tokenizer.FEAT]
         if os.path.exists(q_feat_file):
             record = json.load(open(q_feat_file))
-            q_pos = record['pos']
             q_ner = record['ner']
+            q_pos = record['pos']
+            for feat in q_ner + q_pos:
+                n_q[Tokenizer.FEAT_DICT[feat]] += 1
         else:
-            q_pos = None
-            q_ner = None
             logger.warning('no ner and pos file: %s' % q_feat_file)
             return []
 
         para_lens = []
-        p_pos = []
-        p_ner = []
+        p_pos = dict()
+        p_ner = dict()
         for rel_didx, did in enumerate(all_docids[0]):
             start, end = didx2sidx[did2didx[did]]
             for sidx in range(start, end):
                 para_text = s_tokens[sidx].words()
                 if len(q_text) > 0 and len(para_text) > 0:
                     examples.append({
-                        'id': (0, rel_didx, sidx),
+                        'id': (rel_didx, sidx),
                         'question': q_text,
                         'qlemma': q_tokens[0].lemmas(),
                         'document': para_text,
@@ -276,71 +278,66 @@ class DrQA(object):
 
                     feat_file = os.path.join(DEFAULTS['features'], '%s.json' % did)
                     if os.path.exists(feat_file):
-                        record = json.load(open(q_feat_file))
-                        p_pos.append(record['pos'])
-                        p_ner.append(record['ner'])
+                        record = json.load(open(feat_file))
+                        p_ner[did] = record['ner']
+                        p_pos[did] = record['pos']
                     else:
                         logger.warning('no ner and pos file: %s' % feat_file)
 
             logger.debug('question_p: %s paragraphs: %s' % (queries[0], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
-
-        # Push all examples through the document reader.
-        # We decode argmax start/end indices asychronously on CPU.
-        result_handles = []
         num_loaders = min(self.max_loaders, int(math.floor(len(examples) / 1e3)))
+        all_predictions = []
+        predictions = []
+
+        all_n_p = []
+        all_n_a = []
+        all_p_hidden = []
+        all_a_hidden = []
+        all_p_scores = []
+        all_a_scores = []
         for batch in self._get_loader(examples, num_loaders):
-            q_id = slugify(queries[0])
-            doc_id = all_docids[0][batch[-1][2]]
-            qa_id = (q_id, doc_id)
+            ids = batch[-1][0]
+            rel_didx, sidx = ids
+            doc_id = all_docids[0][rel_didx]
+            doc_score = float(all_doc_scores[0][rel_didx])
 
             handle = self.reader.predict(batch, async_pool=self.processes)
+            start, end, a_score, q_hidden, p_hidden, a_hidden = handle.get()
 
-            result_handles.append((handle, batch[-1], batch[0].size(0)))
+            n_p = [0 for _ in Tokenizer.FEAT]
+            n_a = [0 for _ in Tokenizer.FEAT]
+            for feat in p_ner[doc_id] + p_pos[doc_id]:
+                n_p[Tokenizer.FEAT_DICT[feat]] += 1
+            for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
+                n_a[Tokenizer.FEAT_DICT[feat]] += 1
+            all_n_p.append(n_p)
+            all_n_a.append(n_a)
+            all_p_hidden.append(p_hidden)
+            all_a_hidden.append(a_hidden)
+            all_p_scores.append(doc_score)
+            all_a_scores.append(a_score)
 
+            # TODO: feed features into early stopping model and decide whether to stop or not
+            prediction = {
+                'doc_id': doc_id,
+                'start': start,
+                'end': end,
+                'span': s_tokens[sidx].slice(start, end + 1).untokenize(),
+                'doc_score': doc_score,
+                'span_score': a_score,
+            }
+            if return_context:
+                prediction['context'] = {
+                    'text': s_tokens[sidx].untokenize(),
+                    'start': s_tokens[sidx].offsets()[start][0],
+                    'end': s_tokens[sidx].offsets()[end][1],
+                }
+            predictions.append(prediction)
         t8 = time.time()
         logger.info('paragraphs predicted [time]: %.4f s' % (t8 - t7))
-
-        # Iterate through the predictions, and maintain priority queues for
-        # top scored answers for each question in the batch.
-        queues = [[] for _ in range(len(queries))]
-        for result, ex_ids, batch_size in result_handles:
-            s, e, score = result.get()
-            for i in range(batch_size):
-                # We take the top prediction per split.
-                if len(score[i]) > 0:
-                    item = (score[i][0], ex_ids[i], s[i][0], e[i][0])
-                    queue = queues[ex_ids[i][0]]
-                    if len(queue) < top_n:
-                        heapq.heappush(queue, item)
-                    else:
-                        heapq.heappushpop(queue, item)
-
-        logger.info('answers processed...')
-        # Arrange final top prediction data.
-        all_predictions = []
-        for queue in queues:
-            predictions = []
-            while len(queue) > 0:
-                score, (qidx, rel_didx, sidx), s, e = heapq.heappop(queue)
-                prediction = {
-                    'doc_id': all_docids[qidx][rel_didx],
-                    'start': str(s),
-                    'end': str(e),
-                    'span': s_tokens[sidx].slice(s, e + 1).untokenize(),
-                    'doc_score': float(all_doc_scores[qidx][rel_didx]),
-                    'span_score': float(score),
-                }
-                if return_context:
-                    prediction['context'] = {
-                        'text': s_tokens[sidx].untokenize(),
-                        'start': s_tokens[sidx].offsets()[s][0],
-                        'end': s_tokens[sidx].offsets()[e][1],
-                    }
-                predictions.append(prediction)
-            all_predictions.append(predictions[-1::-1])
-
+        all_predictions.append(predictions[-1::-1])
         logger.info('%d queries processed [time]: %.4f s' %
                     (len(queries), time.time() - t3))
 
