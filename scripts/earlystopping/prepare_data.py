@@ -45,9 +45,9 @@ if __name__ == '__main__':
             for feat in q_ner + q_pos:
                 n_q[Tokenizer.FEAT_DICT[feat]] += 1
         else:
-            print('%s not exist!' % q_path)
-            exit(-1)
+            print('question feature file %s not exist!' % q_path)
             doc_missing_count += 1
+            continue
         q_h_path = os.path.join(DEFAULTS['features'], '%s.npz' % q_id)
 
         if os.path.exists(q_h_path):
@@ -55,8 +55,8 @@ if __name__ == '__main__':
             q_h = q_h_data['q_hidden']
         else:
             q_h = None
-            print('%s not exist!' % q_h_path)
-            exit(-1)
+            print('question hidden file %s not exist!' % q_h_path)
+            continue
         answer = [normalize(a) for a in data['answer']]
         prediction = json.loads(prediction_line)
         ranked_prediction = sorted(prediction, key=lambda k: k['doc_score'])
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 p_h = p_h_data['doc_hidden']
                 a_h = p_h_data['ans_hidden']
             else:
-                print('%s not exist!' % p_h_path)
+                print('paragraph hidden file %s not exist!' % p_h_path)
                 doc_missing_count += 1
                 continue
             all_n_p.append(n_p)
