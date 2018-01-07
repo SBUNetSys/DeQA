@@ -91,7 +91,7 @@ class GalagoRanker(object):
         """
         args = [self.galago_path, func, '--index=', self.index_path]
         args.extend(arg_list)
-        p = subprocess.Popen(args, stdout=subprocess.PIPE)
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         if err:
             logger.warning(err)
