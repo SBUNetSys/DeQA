@@ -135,7 +135,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--prediction_file',
                         default='../../data/earlystopping/SQuAD-v1.1-dev-100-multitask-pipeline.preds')
     parser.add_argument('-a', '--answer_file', default='../../data/datasets/SQuAD-v1.1-dev-100.txt')
-    parser.add_argument('-m', '--no_multiprocess', action='store_false', help='default to use multiprocessing')
+    parser.add_argument('-m', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
     args = parser.parse_args()
 
     missing_count = 0
