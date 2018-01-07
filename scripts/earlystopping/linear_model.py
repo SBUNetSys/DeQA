@@ -373,9 +373,9 @@ if __name__ == '__main__':
         if dev_acc > best_acc:
             best_acc = dev_acc
             best_epoch = epoch
-            model.save(args.model_file + '._%.2f_%d' % (best_acc, best_epoch))
+            model.save(args.model_file)
             if args.checkpoint:
-                model.checkpoint(args.model_file + '.checkpoint.%d' % epoch, epoch + 1)
+                model.checkpoint(args.model_file + '.checkpoint.%.2f_%d' % (best_acc, best_epoch), epoch + 1)
         logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, best_acc:%.2f (%d)'
                     % (stats['epoch'], epoch_time.time(), train_acc, dev_acc, best_acc, best_epoch))
     logger.info('best_acc: %s' % best_acc)
