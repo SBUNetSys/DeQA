@@ -94,5 +94,6 @@ class GalagoRanker(object):
         p = subprocess.Popen(args, stdout=subprocess.PIPE)
         out, err = p.communicate()
         if err:
+            logger.warning('galago args:[%s] error: ' % args)
             logger.warning(err)
         return out.decode("utf-8").strip()

@@ -19,7 +19,7 @@ from drqa.retriever import GalagoRanker
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-fmt = logging.Formatter('%(asctime)s.%(msecs)d: [ %(message)s ]', '%m/%d/%Y_%H:%M:%S')
+fmt = logging.Formatter('%(asctime)s.%(msecs)03d: [ %(message)s ]', '%m/%d/%Y_%H:%M:%S')
 console = logging.StreamHandler()
 console.setFormatter(fmt)
 logger.addHandler(console)
