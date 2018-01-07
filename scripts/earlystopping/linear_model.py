@@ -206,6 +206,7 @@ class RecordDataset(Dataset):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--record_dir', default=DEFAULTS['records'])
+    parser.add_argument('--eval', action='store_true')
     parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
     parser.add_argument('--data_workers', type=int, default=int(os.cpu_count() / 2),
@@ -262,7 +263,10 @@ if __name__ == '__main__':
         num_workers=args.data_workers,
         pin_memory=args.cuda,
     )
-    dev_dataset = RecordDataset(records[divider:], has_answer=True)
+    if args.eval:
+        dev_dataset = RecordDataset(records, has_answer=True)
+    else:
+        dev_dataset = RecordDataset(records[divider:], has_answer=True)
     dev_sampler = torch.utils.data.sampler.SequentialSampler(dev_dataset)
     dev_loader = torch.utils.data.DataLoader(
         dev_dataset,
@@ -272,8 +276,14 @@ if __name__ == '__main__':
         pin_memory=args.cuda,
     )
 
-    model = EarlyStoppingModel(args)
-    model.init_optimizer()
+    if args.eval:
+        model = EarlyStoppingModel.load(args.model_file)
+        dev_acc = model.eval(dev_loader)
+        print('eval acc: %.2f' % dev_acc)
+        exit(0)
+    else:
+        model = EarlyStoppingModel(args)
+        model.init_optimizer()
 
     # --------------------------------------------------------------------------
     # TRAIN/VALID LOOP
