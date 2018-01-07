@@ -135,7 +135,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--prediction_file',
                         default='../../data/earlystopping/SQuAD-v1.1-dev-100-multitask-pipeline.preds')
     parser.add_argument('-a', '--answer_file', default='../../data/datasets/SQuAD-v1.1-dev-100.txt')
-    parser.add_argument('-m', '--multiprocessing', action='store_false', help='default to use multiprocessing')
+    parser.add_argument('-m', '--no_multiprocess', action='store_false', help='default to use multiprocessing')
     args = parser.parse_args()
 
     missing_count = 0
@@ -148,7 +148,16 @@ if __name__ == '__main__':
         os.makedirs(DEFAULTS['records'])
 
     s = time.time()
-    if args.multiprocessing:
+    if args.no_multiprocess:
+        for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
+                                              open(prediction_file, encoding=ENCODING)):
+            missing, total, stop = process_record(data_line, prediction_line)
+            missing_count += missing
+            stop_count += stop
+            total_count += total
+            print('processed %d records...' % total_count)
+            sys.stdout.flush()
+    else:
         print('using multiprocessing...')
         result_handles = []
         async_pool = ProcessPool()
@@ -158,15 +167,6 @@ if __name__ == '__main__':
             result_handles.append(handle)
         for result in result_handles:
             missing, total, stop = result.get()
-            missing_count += missing
-            stop_count += stop
-            total_count += total
-            print('processed %d records...' % total_count)
-            sys.stdout.flush()
-    else:
-        for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
-                                              open(prediction_file, encoding=ENCODING)):
-            missing, total, stop = process_record(data_line, prediction_line)
             missing_count += missing
             stop_count += stop
             total_count += total
