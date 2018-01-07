@@ -368,4 +368,5 @@ if __name__ == '__main__':
         logger.info('Epoch %d took %.2f (s), train acc: %.2f, dev acc: %.2f '
                     % (stats['epoch'], epoch_time.time(), train_acc, dev_acc))
         if args.checkpoint:
-            model.checkpoint(args.model_file + '.checkpoint', epoch + 1)
+            model.checkpoint(args.model_file + '.checkpoint.' + best_acc, epoch + 1)
+    logger.info('best_acc: %s' % best_acc)
