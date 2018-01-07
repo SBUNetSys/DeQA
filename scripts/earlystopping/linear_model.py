@@ -267,7 +267,7 @@ class RecordDataset(Dataset):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--record_size', default=14000)
+    parser.add_argument('-r', '--record_size', type=int, default=14000)
     # parser.add_argument('-r', '--record_file',
     #                     default='../../data/earlystopping/records-10.txt')
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
@@ -352,7 +352,7 @@ if __name__ == '__main__':
         for idx, ex in enumerate(train_loader):
             train_loss.update(*model.update(ex))
 
-            if idx % 100 == 0:
+            if idx % 1000 == 0:
                 logger.info('epoch: %d, iter = %d/%d | ' %
                             (stats['epoch'], idx, len(train_loader)) +
                             'loss = %.2f, elapsed time = %.2f (s)' %
