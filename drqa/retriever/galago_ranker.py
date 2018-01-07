@@ -38,7 +38,7 @@ class GalagoRanker(object):
             for keyword_item in keyword_items:
                 keyword, _ = keyword_item
                 # keyword_query = '#od:1( %s )' % keyword if ' ' in keyword else keyword
-                keyword_query = keyword.replace('-', ' ')
+                keyword_query = keyword.replace('-', ' ').replace('#', '')
                 word_queries.append(keyword_query)
         else:
             word_queries = self.parse(utils.normalize(question))
