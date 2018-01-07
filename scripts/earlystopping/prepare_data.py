@@ -35,6 +35,7 @@ def process_record(data_line_, prediction_line_):
             n_q[Tokenizer.FEAT_DICT[feat]] += 1
     else:
         print('question feature file %s not exist!' % q_path)
+        sys.stdout.flush()
         missing_count_ += 1
         return missing_count_, total_count_, stop_count_
     q_h_path = os.path.join(DEFAULTS['features'], '%s.npz' % q_id)
@@ -43,8 +44,8 @@ def process_record(data_line_, prediction_line_):
         q_h_data = np.load(q_h_path)
         q_h = q_h_data['q_hidden']
     else:
-        q_h = None
         print('question hidden file %s not exist!' % q_h_path)
+        sys.stdout.flush()
         return missing_count_, total_count_, stop_count_
     answer = [normalize(a) for a in data['answer']]
     prediction = json.loads(prediction_line_)
@@ -84,6 +85,7 @@ def process_record(data_line_, prediction_line_):
             a_h = p_h_data['ans_hidden']
         else:
             print('paragraph hidden file %s not exist!' % p_h_path)
+            sys.stdout.flush()
             missing_count_ += 1
             continue
         all_n_p.append(n_p)
@@ -152,8 +154,7 @@ if __name__ == '__main__':
         async_pool = ProcessPool()
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            record = (data_line, prediction_line)
-            handle = async_pool.apply_async(process_record, record)
+            handle = async_pool.apply_async(process_record, (data_line, prediction_line))
             result_handles.append(handle)
         for result in result_handles:
             missing, total, stop = result.get()
@@ -161,6 +162,7 @@ if __name__ == '__main__':
             stop_count += stop
             total_count += total
             print('processed %d records...' % total_count)
+            sys.stdout.flush()
     else:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
@@ -169,9 +171,10 @@ if __name__ == '__main__':
             stop_count += stop
             total_count += total
             print('processed %d records...' % total_count)
+            sys.stdout.flush()
 
     e = time.time()
-    print('processed %d records...' % total_count)
-    print('stop count: %d' % stop_count)
+    print('%d records' % total_count)
+    print('%d stop labels' % stop_count)
     print('%d docs not found' % missing_count)
-    print('total time: %.4f s' % (e - s))
+    print('took %.4f s' % (e - s))
