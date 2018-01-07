@@ -10,6 +10,7 @@ from drqa.reader.utils import slugify, aggregate
 from drqa.tokenizers.tokenizer import Tokenizer
 import numpy as np
 import pickle as pk
+import time
 ENCODING = "utf-8"
 
 if __name__ == '__main__':
@@ -28,6 +29,7 @@ if __name__ == '__main__':
         os.makedirs(DEFAULTS['records'])
 
     stop_count = 0
+    s = time.time()
     for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                           open(prediction_file, encoding=ENCODING)):
         data = json.loads(data_line)
@@ -128,17 +130,16 @@ if __name__ == '__main__':
                 stop_count += 1
             else:
                 record['stop'] = 0
-            no += 1
-            record_path = os.path.join(DEFAULTS['records'], '%s.pkl' % no)
+            record_path = os.path.join(DEFAULTS['records'], '%s_%s.pkl' % (q_id, doc_id))
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
-            # with open(record_path, 'w') as f:
-            #     f.write(json.dumps(record, sort_keys=True))
-            if no % 10 == 0:
+            no += 1
+            if no % 100 == 0:
                 print('processed %d records...' % no)
             if found_correct:
                 break
-
+    e = time.time()
     print('processed %d records...' % no)
     print('stop count: %d' % stop_count)
     print('%d docs not found' % doc_missing_count)
+    print('total time: %.4f s' % (e - s))
