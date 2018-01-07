@@ -352,6 +352,7 @@ if __name__ == '__main__':
     logger.info('Starting training...')
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
     best_acc = 0
+    best_epoch = 0
     for epoch in range(0, args.epochs):
         stats['epoch'] = epoch
         train_loss = utils.AverageMeter()
@@ -371,9 +372,10 @@ if __name__ == '__main__':
         dev_acc = model.eval(dev_loader)
         if dev_acc > best_acc:
             best_acc = dev_acc
+            best_epoch = epoch
             model.save(args.model_file)
-        logger.info('Epoch %-2d took %.2f (s), train acc: %.2f, dev acc: %.2f '
-                    % (stats['epoch'], epoch_time.time(), train_acc, dev_acc))
+        logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, best_acc:%.2f (%d)'
+                    % (stats['epoch'], epoch_time.time(), train_acc, dev_acc, best_acc, best_epoch))
         if args.checkpoint:
-            model.checkpoint(args.model_file + '.checkpoint.%.2f' % best_acc, epoch + 1)
+            model.checkpoint(args.model_file + '.checkpoint.%d' % epoch, epoch + 1)
     logger.info('best_acc: %s' % best_acc)
