@@ -112,7 +112,7 @@ def process_record(data_line_, prediction_line_):
         record['hp'] = f_hp
         record['ha'] = f_ha
         record['nq'] = list(map(float, n_q))
-        record['hq'] = list(map(float, np.asarray(q_h, dtype=float)))
+        record['hq'] = list(map(float, q_h))
 
         exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
         if exact_match:
