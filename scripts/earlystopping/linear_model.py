@@ -11,7 +11,7 @@ from torch.autograd import Variable
 import logging
 import random
 import pickle as pk
-import time
+import glob
 import gc
 from drqa.tokenizers.tokenizer import Tokenizer
 from drqa.reader import utils
@@ -158,61 +158,11 @@ class EarlyStoppingModel(object):
         return EarlyStoppingModel(args_, state_dict)
 
 
-# def batchify(batch_):
-#     NUM_INPUTS = 1
-#     NUM_LABEL = 1
-#     length = len(batch_)
-#     ans_scores = [one[0] for one in batch_]
-#     ans_t = torch.zeros(length, 1)
-#     for i, d in enumerate(ans_scores):
-#         ans_t[i, :d.size(0)].copy_(d)
-#
-#     doc_scores = [one[1] for one in batch_]
-#     doc_t = torch.zeros(length, 1)
-#     for i, d in enumerate(doc_scores):
-#         doc_t[i, :d.size(0)].copy_(d)
-#
-#     answer_feature = [one[2] for one in batch_]
-#     a_f_t = torch.zeros(length, MAX_A_LEN * NLP_NUM)
-#     for i, d in enumerate(answer_feature):
-#         a_f_t[i].copy_(d.view(MAX_A_LEN * NLP_NUM))
-#
-#     question_feature = [one[3] for one in batch_]
-#     q_f_t = torch.zeros(length, MAX_Q_LEN * NLP_NUM)
-#     for i, d in enumerate(question_feature):
-#         q_f_t[i].copy_(d.view(MAX_Q_LEN * NLP_NUM))
-#
-#     paragraph_feature = [one[4] for one in batch_]
-#     p_f_t = torch.zeros(length, MAX_P_LEN * (NLP_NUM + 1))
-#     for i, d in enumerate(paragraph_feature):
-#         p_f_t[i].copy_(d.view(MAX_P_LEN * (NLP_NUM + 1)))
-#
-#     if len(batch_[0]) == NUM_INPUTS:
-#         return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
-#                           q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1)
-#     elif len(batch_[0]) == (NUM_INPUTS + NUM_LABEL):
-#         label = [one[5] for one in batch_]
-#         l_t = torch.LongTensor(len(label), 1).zero_()
-#         for i, d in enumerate(label):
-#             l_t[i].copy_(d)
-#     else:
-#         raise RuntimeError('Incorrect number of inputs per batch')
-#     return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
-#                       q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1), l_t.view(length)
-
-
 class RecordDataset(Dataset):
 
     def __init__(self, records_, has_answer=False):
         self.records_ = records_
         self.has_answer = has_answer
-        # logger.info('Loading model %s' % weight_file_)
-        # saved_params = torch.load(weight_file_, map_location=lambda storage, loc: storage)
-        # state_dict = saved_params['state_dict']
-        # emb_weights = state_dict['embedding.weight']
-        # self.embedding = nn.Embedding(emb_weights.size(0), emb_weights.size(1), padding_idx=0)
-        # self.embedding.weight = nn.Parameter(emb_weights)
-        # self.embedding.weight.requires_grad = False
 
     def __len__(self):
         return len(self.records_)
@@ -223,25 +173,15 @@ class RecordDataset(Dataset):
     def vectorize(self, record_, has_label=False):
         """
         vectorize a data record
-        :param record_: data record dict, example:
-        {"a": "2", "a_idx": [499], "a_s": 19766376.0, "d_s": -7.04479736,
-        "p_idx": [212316, 155218, ..., 608], "p_ner": ["O", "PERSON", "PERSON", ... , "ORGANIZATION"],
-        "p_pos": ["JJ", "NNS", "VBP", ..., "NNP", "-RRB-", "."], "p_tf": [0.005495, 0.005495, ... , 0.010989],
-        "q": "How many Grammys has Lady Gaga won?",
-        "q_idx": [252, 531, 62637, 613, 57941, 176484, 526, 144],
-        "q_ner": ["O", "O", "O", "O", "PERSON", "PERSON", "O", "O"],
-        "q_pos": ["WRB", "JJ", "NNPS", "VBZ", "NNP", "NNP", "VBD", "."],
-        "q_tf": [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],
-        "stop": 0}
+        :param record_: data record file path
         :param has_label: whether dataset has label or not
         :return: vectorized records: a_s_t, d_s_t, a_emb, q_f, p_f, l_t(if has label)
         """
 
-        record_path = os.path.join(DEFAULTS['records'], '%d.pkl' % record_)
-        if os.path.exists(record_path):
-            record_data = pk.load(open(record_path, "rb"))
+        if os.path.exists(record_):
+            record_data = pk.load(open(record_, "rb"))
         else:
-            print('warning: %s not exist!' % record_path)
+            print('warning: %s not exist!' % record_)
         sp = torch.FloatTensor(record_data['sp'])
         sa = torch.FloatTensor(record_data['sa'])
 
@@ -263,19 +203,9 @@ class RecordDataset(Dataset):
             return ft
 
 
-def count_records(record_path=None):
-    import glob
-    if not record_path:
-        record_path = DEFAULTS['records']
-    return len(glob.glob("%s/*.pkl" % record_path))
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--record_size', type=int, default=count_records())
-    # parser.add_argument('-r', '--record_file',
-    #                     default='../../data/earlystopping/records-10.txt')
-    # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
+    parser.add_argument('-r', '--record_dir', default=DEFAULTS['records'])
     parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
     parser.add_argument('--data_workers', type=int, default=int(os.cpu_count() / 2),
@@ -320,7 +250,7 @@ if __name__ == '__main__':
     console.setFormatter(fmt)
     logger.addHandler(console)
 
-    records = list(range(1, args.record_size + 1, 1))
+    records = glob.glob("%s/*.pkl" % args.record_dir)
     random.shuffle(records)
     divider = int(args.split_ratio * len(records))
     train_dataset = RecordDataset(records[:divider], has_answer=True)
