@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import json
 import argparse
 import os
 import torch
@@ -8,9 +7,9 @@ import torch.autograd
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset
-from torch.utils.data.sampler import Sampler
 from torch.autograd import Variable
 import logging
+import random
 import pickle as pk
 import time
 import gc
@@ -312,6 +311,7 @@ if __name__ == '__main__':
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     # Set random state
     torch.manual_seed(args.random_seed)
+    random.seed(args.random_seed)
     if args.cuda:
         torch.cuda.manual_seed(args.random_seed)
     # Set logging
@@ -321,7 +321,8 @@ if __name__ == '__main__':
     console.setFormatter(fmt)
     logger.addHandler(console)
 
-    records = range(1, args.record_size + 1, 1)
+    records = list(range(1, args.record_size + 1, 1))
+    random.shuffle(records)
     divider = int(args.split_ratio * len(records))
     train_dataset = RecordDataset(records[:divider], has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
