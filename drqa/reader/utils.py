@@ -305,15 +305,4 @@ def aggregate(data_):
     :return: max, mean, std, var
     """
     import numpy as np
-    data_feature = []
-    for item in np.transpose(data_):
-        maximum = np.max(item)
-        mean = np.mean(item)
-        std = np.std(item)
-        var = np.var(item)
-        data_feature.append(maximum)
-        data_feature.append(mean)
-        data_feature.append(std)
-        data_feature.append(var)
-
-    return data_feature
+    return np.max(data_, 0).tolist() + np.mean(data_, 0).tolist() + np.std(data_, 0).tolist() + np.var(data_, 0).tolist()

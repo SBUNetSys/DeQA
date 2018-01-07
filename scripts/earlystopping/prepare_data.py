@@ -115,8 +115,8 @@ if __name__ == '__main__':
             record['sa'] = f_sa
             record['hp'] = f_hp
             record['ha'] = f_ha
-            record['nq'] = n_q
-            record['hq'] = q_h
+            record['nq'] = list(map(float, n_q))
+            record['hq'] = list(map(float, np.asarray(q_h, dtype=float)))
 
             if found_correct:
                 record['stop'] = 1
@@ -128,10 +128,12 @@ if __name__ == '__main__':
                 else:
                     record['stop'] = 0
             no += 1
-            record_path = os.path.join(DEFAULTS['features'], '%s.pkl' % no)
+            record_path = os.path.join(DEFAULTS['records'], '%s.pkl' % no)
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
-            if no % 100 == 0:
+            # with open(record_path, 'w') as f:
+            #     f.write(json.dumps(record, sort_keys=True))
+            if no % 10 == 0:
                 print('processed %d records...' % no)
 
     print('%d docs not found' % doc_missing_count)

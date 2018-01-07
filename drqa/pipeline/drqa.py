@@ -95,9 +95,10 @@ class DrQA(object):
         self.fixed_candidates = fixed_candidates is not None
         self.cuda = cuda
 
-        feat_dir = DEFAULTS['features']
-        if not os.path.exists(feat_dir):
-            os.makedirs(feat_dir)
+        if not os.path.exists(DEFAULTS['features']):
+            os.makedirs(DEFAULTS['features'])
+        if not os.path.exists(DEFAULTS['records']):
+            os.makedirs(DEFAULTS['records'])
 
         logger.info('Initializing document ranker...')
         ranker_config = ranker_config or {}
