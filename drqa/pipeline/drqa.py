@@ -256,8 +256,7 @@ class DrQA(object):
             for feat in q_ner + q_pos:
                 n_q[Tokenizer.FEAT_DICT[feat]] += 1
         else:
-            logger.warning('no ner and pos file: %s' % q_feat_file)
-            return []
+            logger.warning('no question ner and pos file: %s' % q_feat_file)
 
         para_lens = []
         p_pos = dict()
@@ -283,7 +282,7 @@ class DrQA(object):
                         p_ner[did] = record['ner']
                         p_pos[did] = record['pos']
                     else:
-                        logger.warning('no ner and pos file: %s' % feat_file)
+                        logger.warning('no paragraph ner and pos file: %s' % feat_file)
 
             logger.debug('question_p: %s paragraphs: %s' % (queries[0], para_lens))
         t7 = time.time()

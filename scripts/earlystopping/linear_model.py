@@ -252,6 +252,7 @@ if __name__ == '__main__':
     logger.addHandler(console)
 
     records = glob.glob("%s/*.pkl" % args.record_dir)
+    logger.info('found %d records' % len(records))
     random.shuffle(records)
     divider = int(args.split_ratio * len(records))
     train_dataset = RecordDataset(records[:divider], has_answer=True)
@@ -278,8 +279,9 @@ if __name__ == '__main__':
 
     if args.eval:
         model = EarlyStoppingModel.load(args.model_file)
+        logger.info('model loaded, begin evaluating...')
         dev_acc = model.eval(dev_loader)
-        print('eval acc: %.2f' % dev_acc)
+        logger.info('eval acc: %.2f' % dev_acc)
         exit(0)
     else:
         model = EarlyStoppingModel(args)

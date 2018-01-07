@@ -134,7 +134,7 @@ if __name__ == '__main__':
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
             no += 1
-            if no % 100 == 0:
+            if no % 1000 == 0:
                 print('processed %d records...' % no)
             if found_correct:
                 break
