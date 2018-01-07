@@ -91,6 +91,7 @@ def index_embedding_words(embedding_file):
 
 def load_words(args, examples):
     """Iterate and index all the words in examples (documents + questions)."""
+
     def _insert(iterable):
         for w in iterable:
             w = Dictionary.normalize(w)
@@ -135,6 +136,7 @@ def top_question_words(args, examples, word_dict):
 
 def build_feature_dict(args, examples):
     """Index features (one hot) from fields in examples and options."""
+
     def _insert(feature):
         if feature not in feature_dict:
             feature_dict[feature] = len(feature_dict)
@@ -183,6 +185,7 @@ def slugify(value):
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
         return re.sub(r'\b(a|an|the)\b', ' ', text)
 
@@ -305,4 +308,6 @@ def aggregate(data_):
     :return: max, mean, std, var
     """
     import numpy as np
-    return np.max(data_, 0).tolist() + np.mean(data_, 0).tolist() + np.std(data_, 0).tolist() + np.var(data_, 0).tolist()
+    features = np.max(data_, 0).flatten().tolist() + np.mean(data_, 0).flatten().tolist() \
+               + np.std(data_, 0).flatten().tolist() + np.var(data_, 0).flatten().tolist()
+    return features

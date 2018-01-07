@@ -11,6 +11,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 from torch.autograd import Variable
 import logging
+import pickle as pk
 import time
 import gc
 from drqa.tokenizers.tokenizer import Tokenizer
@@ -20,11 +21,8 @@ from drqa.pipeline import DEFAULTS
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
 NUM_CLASS = 2
-MAX_A_LEN = 15
-MAX_Q_LEN = 34
-MAX_P_LEN = 2683
-NLP_NUM = len(Tokenizer.NER) + len(Tokenizer.POS)
-DIM = 2 + MAX_A_LEN * NLP_NUM + MAX_Q_LEN * NLP_NUM + MAX_P_LEN * (NLP_NUM + 1)
+NLP_NUM = len(Tokenizer.FEAT)
+DIM = 2*4 + 4 * (NLP_NUM * 2 + 768 * 2) + NLP_NUM + 768
 
 
 class EarlyStoppingClassifier(nn.Module):
@@ -61,10 +59,10 @@ class EarlyStoppingModel(object):
         # Transfer to GPU
         if self.args.cuda:
             inputs = Variable(ex[0].cuda(async=True))
-            target = Variable(ex[1].cuda(async=True))
+            target = Variable(ex[1].squeeze().cuda(async=True))
         else:
             inputs = Variable(ex[0])
-            target = Variable(ex[1])
+            target = Variable(ex[1].squeeze())
 
         # Run forward
         score_ = self.network(inputs)
@@ -159,47 +157,47 @@ class EarlyStoppingModel(object):
         return EarlyStoppingModel(args_, state_dict)
 
 
-def batchify(batch_):
-    NUM_INPUTS = 5
-    NUM_LABEL = 1
-    length = len(batch_)
-    ans_scores = [one[0] for one in batch_]
-    ans_t = torch.zeros(length, 1)
-    for i, d in enumerate(ans_scores):
-        ans_t[i, :d.size(0)].copy_(d)
-
-    doc_scores = [one[1] for one in batch_]
-    doc_t = torch.zeros(length, 1)
-    for i, d in enumerate(doc_scores):
-        doc_t[i, :d.size(0)].copy_(d)
-
-    answer_feature = [one[2] for one in batch_]
-    a_f_t = torch.zeros(length, MAX_A_LEN * NLP_NUM)
-    for i, d in enumerate(answer_feature):
-        a_f_t[i].copy_(d.view(MAX_A_LEN * NLP_NUM))
-
-    question_feature = [one[3] for one in batch_]
-    q_f_t = torch.zeros(length, MAX_Q_LEN * NLP_NUM)
-    for i, d in enumerate(question_feature):
-        q_f_t[i].copy_(d.view(MAX_Q_LEN * NLP_NUM))
-
-    paragraph_feature = [one[4] for one in batch_]
-    p_f_t = torch.zeros(length, MAX_P_LEN * (NLP_NUM + 1))
-    for i, d in enumerate(paragraph_feature):
-        p_f_t[i].copy_(d.view(MAX_P_LEN * (NLP_NUM + 1)))
-
-    if len(batch_[0]) == NUM_INPUTS:
-        return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
-                      q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1)
-    elif len(batch_[0]) == (NUM_INPUTS + NUM_LABEL):
-        label = [one[5] for one in batch_]
-        l_t = torch.LongTensor(len(label), 1).zero_()
-        for i, d in enumerate(label):
-            l_t[i].copy_(d)
-    else:
-        raise RuntimeError('Incorrect number of inputs per batch')
-    return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
-                      q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1), l_t.view(length)
+# def batchify(batch_):
+#     NUM_INPUTS = 1
+#     NUM_LABEL = 1
+#     length = len(batch_)
+#     ans_scores = [one[0] for one in batch_]
+#     ans_t = torch.zeros(length, 1)
+#     for i, d in enumerate(ans_scores):
+#         ans_t[i, :d.size(0)].copy_(d)
+#
+#     doc_scores = [one[1] for one in batch_]
+#     doc_t = torch.zeros(length, 1)
+#     for i, d in enumerate(doc_scores):
+#         doc_t[i, :d.size(0)].copy_(d)
+#
+#     answer_feature = [one[2] for one in batch_]
+#     a_f_t = torch.zeros(length, MAX_A_LEN * NLP_NUM)
+#     for i, d in enumerate(answer_feature):
+#         a_f_t[i].copy_(d.view(MAX_A_LEN * NLP_NUM))
+#
+#     question_feature = [one[3] for one in batch_]
+#     q_f_t = torch.zeros(length, MAX_Q_LEN * NLP_NUM)
+#     for i, d in enumerate(question_feature):
+#         q_f_t[i].copy_(d.view(MAX_Q_LEN * NLP_NUM))
+#
+#     paragraph_feature = [one[4] for one in batch_]
+#     p_f_t = torch.zeros(length, MAX_P_LEN * (NLP_NUM + 1))
+#     for i, d in enumerate(paragraph_feature):
+#         p_f_t[i].copy_(d.view(MAX_P_LEN * (NLP_NUM + 1)))
+#
+#     if len(batch_[0]) == NUM_INPUTS:
+#         return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
+#                           q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1)
+#     elif len(batch_[0]) == (NUM_INPUTS + NUM_LABEL):
+#         label = [one[5] for one in batch_]
+#         l_t = torch.LongTensor(len(label), 1).zero_()
+#         for i, d in enumerate(label):
+#             l_t[i].copy_(d)
+#     else:
+#         raise RuntimeError('Incorrect number of inputs per batch')
+#     return torch.cat([ans_t.view(length, -1), doc_t.view(length, -1), a_f_t.view(length, -1),
+#                       q_f_t.view(length, -1), p_f_t.view(length, -1)], dim=1), l_t.view(length)
 
 
 class RecordDataset(Dataset):
@@ -237,99 +235,41 @@ class RecordDataset(Dataset):
         :param has_label: whether dataset has label or not
         :return: vectorized records: a_s_t, d_s_t, a_emb, q_f, p_f, l_t(if has label)
         """
-        a_s = record_['a_s']
-        a_s_t = torch.FloatTensor([a_s])
 
-        d_s = record_['d_s']
-        d_s_t = torch.FloatTensor([d_s])
-
-        doc_id = record_['doc_id']
-        doc_path = os.path.join(DEFAULTS['features'], '%s.json' % doc_id)
-        if os.path.exists(doc_path):
-            doc_data = open(doc_path, encoding=ENCODING).read()
-            feature = json.loads(doc_data)
-            record_['p_tf'] = feature['tf']
-            record_['p_ner'] = feature['ner']
-            record_['p_pos'] = feature['pos']
-
-            # a_idx = feature['idx'][int(s):int(e) + 1]
-            # record['a_idx'] = a_idx
+        record_path = os.path.join(DEFAULTS['records'], '%d.pkl' % record_)
+        if os.path.exists(record_path):
+            record_data = pk.load(open(record_path, "rb"))
         else:
-            print('warning: %s not exist!' % doc_path)
+            print('warning: %s not exist!' % record_path)
+        sp = torch.FloatTensor(record_data['sp'])
+        sa = torch.FloatTensor(record_data['sa'])
 
-        p_ner = record_['p_ner']
-        p_ner_t = torch.zeros(MAX_P_LEN, len(Tokenizer.NER))
-        for i, w in enumerate(p_ner):
-            if w in Tokenizer.NER_DICT:
-                p_ner_t[i][Tokenizer.NER_DICT[w]] = 1.0
+        np = torch.FloatTensor(record_data['np'])
+        na = torch.FloatTensor(record_data['na'])
+        nq = torch.FloatTensor(record_data['nq'])
 
-        p_pos = record_['p_pos']
-        p_pos_t = torch.zeros(MAX_P_LEN, len(Tokenizer.POS))
-        for i, w in enumerate(p_pos):
-            if w in Tokenizer.POS_DICT:
-                p_pos_t[i][Tokenizer.POS_DICT[w]] = 1.0
+        hq = torch.FloatTensor(record_data['hq'])
+        hp = torch.FloatTensor(record_data['hp'])
+        ha = torch.FloatTensor(record_data['ha'])
 
-        s, e = record_['a_loc']
-        a_ner = p_ner[s:e+1]
-        a_ner_t = torch.zeros(MAX_A_LEN, len(Tokenizer.NER))
-        for i, w in enumerate(a_ner):
-            if w in Tokenizer.NER_DICT:
-                a_ner_t[i][Tokenizer.NER_DICT[w]] = 1.0
-
-        a_pos = p_pos[s:e+1]
-        a_pos_t = torch.zeros(MAX_A_LEN, len(Tokenizer.POS))
-        for i, w in enumerate(a_pos):
-            if w in Tokenizer.POS_DICT:
-                a_pos_t[i][Tokenizer.POS_DICT[w]] = 1.0
-
-        a_f = torch.cat([a_ner_t, a_pos_t], dim=1)
-
-        p_tf = record_['p_tf']
-        p_tf_t = torch.zeros(MAX_P_LEN)
-        p_tf_t[:len(p_tf)].copy_(torch.FloatTensor(p_tf))
-
-        # p_idx = record_['p_idx']
-        # p_idx_t = torch.LongTensor(p_idx)
-        # p_emb = self.embedding(p_idx_t)
-
-        p_f = torch.cat([p_ner_t, p_pos_t, p_tf_t.view(-1, 1)], dim=1)
-        q_ner = record_['q_ner']
-        q_ner_t = torch.zeros(MAX_Q_LEN, len(Tokenizer.NER))
-        for i, w in enumerate(q_ner):
-            if w in Tokenizer.NER_DICT:
-                q_ner_t[i][Tokenizer.NER_DICT[w]] = 1.0
-
-        q_pos = record_['q_pos']
-        q_pos_t = torch.zeros(MAX_Q_LEN, len(Tokenizer.POS))
-        for i, w in enumerate(q_pos):
-            if w in Tokenizer.POS_DICT:
-                q_pos_t[i][Tokenizer.POS_DICT[w]] = 1.0
-
-        # q_tf = record_['q_tf']
-        # q_tf_t = torch.zeros(MAX_Q_LEN, 1)
-        # q_tf_t[:len(p_tf), 0].copy_(torch.FloatTensor(q_tf).view(-1, 1))
-
-        # q_idx = record_['q_idx']
-        # q_idx_t = torch.LongTensor(q_idx)
-        # q_emb = self.embedding(q_idx_t)
-        q_f = torch.cat([q_ner_t, q_pos_t], dim=1)
+        ft = torch.cat([sp, sa, nq, np, na, hq, hp, ha])
 
         if has_label:
-            label = record_['stop']
-            l_t = torch.LongTensor([label])
-            return a_s_t, d_s_t, a_f, q_f, p_f, l_t
+            label = record_data['stop']
+            lt = torch.LongTensor([label])
+            return ft, lt
         else:
-            return a_s_t, d_s_t, a_f, q_f, p_f
+            return ft
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--record_file',
-                        default='../../data/earlystopping/records-10.txt')
+    # parser.add_argument('-r', '--record_file',
+    #                     default='../../data/earlystopping/records-10.txt')
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
     parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
-    parser.add_argument('--data_workers', type=int, default=int(os.cpu_count()/2),
+    parser.add_argument('--data_workers', type=int, default=int(os.cpu_count() / 2),
                         help='Number of subprocesses for data loading')
     parser.add_argument('--parallel', action='store_true',
                         help='Use DataParallel on all available GPUs')
@@ -369,13 +309,8 @@ if __name__ == '__main__':
     console = logging.StreamHandler()
     console.setFormatter(fmt)
     logger.addHandler(console)
-    record_file = args.record_file
-    records = []
-    logger.info('reading data records: %s' % record_file)
-    for data_line in open(record_file, encoding=ENCODING):
-        record = json.loads(data_line)
-        records.append(record)
 
+    records = range(1, 15001, 1)
     divider = int(args.split_ratio * len(records))
     train_dataset = RecordDataset(records[:divider], has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
@@ -384,7 +319,6 @@ if __name__ == '__main__':
         batch_size=args.batch_size,
         sampler=train_sampler,
         num_workers=args.data_workers,
-        collate_fn=batchify,
         pin_memory=args.cuda,
     )
     dev_dataset = RecordDataset(records[divider:], has_answer=False)
@@ -394,7 +328,6 @@ if __name__ == '__main__':
         batch_size=args.batch_size,
         sampler=dev_sampler,
         num_workers=args.data_workers,
-        collate_fn=batchify,
         pin_memory=args.cuda,
     )
 
