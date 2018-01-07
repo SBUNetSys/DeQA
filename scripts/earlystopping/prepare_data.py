@@ -10,6 +10,7 @@ from drqa.reader.utils import slugify, aggregate
 from drqa.tokenizers.tokenizer import Tokenizer
 import numpy as np
 import pickle as pk
+import sys
 import time
 ENCODING = "utf-8"
 
@@ -136,6 +137,7 @@ if __name__ == '__main__':
             no += 1
             if no % 1000 == 0:
                 print('processed %d records...' % no)
+                sys.stdout.flush()
             if found_correct:
                 break
     e = time.time()
