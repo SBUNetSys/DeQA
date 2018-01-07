@@ -305,7 +305,9 @@ class DrQA(object):
             rel_didx, sidx = ids
             doc_id = all_docids[0][rel_didx]
             doc_score = float(all_doc_scores[0][rel_didx])
-
+            if batch[0].size(1) <= 10:
+                print('too short, doc_id:', doc_id)
+                continue
             handle = self.reader.predict(batch, async_pool=self.processes)
             start, end, a_score, q_hidden, p_hidden, a_hidden = handle.get()
             prediction = {
