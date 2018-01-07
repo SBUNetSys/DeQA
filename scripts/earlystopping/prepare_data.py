@@ -24,7 +24,10 @@ if __name__ == '__main__':
     no = 0
     answer_file = args.answer_file
     prediction_file = args.prediction_file
+    if not os.path.exists(DEFAULTS['records']):
+        os.makedirs(DEFAULTS['records'])
 
+    stop_count = 0
     for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                           open(prediction_file, encoding=ENCODING)):
         data = json.loads(data_line)
@@ -118,15 +121,13 @@ if __name__ == '__main__':
             record['nq'] = list(map(float, n_q))
             record['hq'] = list(map(float, np.asarray(q_h, dtype=float)))
 
-            if found_correct:
+            exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
+            if exact_match:
                 record['stop'] = 1
+                found_correct = True
+                stop_count += 1
             else:
-                exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
-                if exact_match:
-                    found_correct = True
-                    record['stop'] = 1
-                else:
-                    record['stop'] = 0
+                record['stop'] = 0
             no += 1
             record_path = os.path.join(DEFAULTS['records'], '%s.pkl' % no)
             with open(record_path, 'wb') as f:
@@ -135,5 +136,9 @@ if __name__ == '__main__':
             #     f.write(json.dumps(record, sort_keys=True))
             if no % 10 == 0:
                 print('processed %d records...' % no)
+            if found_correct:
+                break
 
+    print('processed %d records...' % no)
+    print('stop count: %d' % stop_count)
     print('%d docs not found' % doc_missing_count)

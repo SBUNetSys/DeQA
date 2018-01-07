@@ -29,12 +29,11 @@ class EarlyStoppingClassifier(nn.Module):
 
     def __init__(self):
         super(EarlyStoppingClassifier, self).__init__()
-        self.fc1 = nn.Linear(DIM, H)
-        self.fc2 = nn.Linear(H, NUM_CLASS)
+        self.fc1 = nn.Linear(DIM, NUM_CLASS)
 
     def forward(self, input_):
         x = self.fc1(input_).clamp(min=0)
-        return F.log_softmax(self.fc2(x))
+        return F.log_softmax(x)
 
 
 class EarlyStoppingModel(object):
