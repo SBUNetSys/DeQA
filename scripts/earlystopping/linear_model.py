@@ -23,7 +23,7 @@ ENCODING = "utf-8"
 H = 128
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
-DIM = 2*4 + 4 * (NLP_NUM * 2 + 768 * 2) + NLP_NUM + 768
+DIM = 2 * 4 + 4 * (NLP_NUM * 2 + 768 * 2) + NLP_NUM + 768
 
 
 class EarlyStoppingClassifier(nn.Module):
@@ -267,6 +267,7 @@ class RecordDataset(Dataset):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('-r', '--record_size', default=14000)
     # parser.add_argument('-r', '--record_file',
     #                     default='../../data/earlystopping/records-10.txt')
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
@@ -279,7 +280,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_seed', type=int, default=1013,
                         help=('Random seed for all numpy/torch/cuda '
                               'operations (for reproducibility)'))
-    parser.add_argument('--epochs', type=int, default=40,
+    parser.add_argument('--epochs', type=int, default=100,
                         help='Train data iterations')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training')
@@ -313,7 +314,7 @@ if __name__ == '__main__':
     console.setFormatter(fmt)
     logger.addHandler(console)
 
-    records = range(1, 15001, 1)
+    records = range(1, args.record_size + 1, 1)
     divider = int(args.split_ratio * len(records))
     train_dataset = RecordDataset(records[:divider], has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
@@ -324,7 +325,7 @@ if __name__ == '__main__':
         num_workers=args.data_workers,
         pin_memory=args.cuda,
     )
-    dev_dataset = RecordDataset(records[divider:], has_answer=False)
+    dev_dataset = RecordDataset(records[divider:], has_answer=True)
     dev_sampler = torch.utils.data.sampler.SequentialSampler(dev_dataset)
     dev_loader = torch.utils.data.DataLoader(
         dev_dataset,
@@ -361,8 +362,8 @@ if __name__ == '__main__':
 
         train_acc = model.eval(train_loader)
         dev_acc = model.eval(dev_loader)
-        if dev_acc > best_acc:
-            best_acc = dev_acc
+        if train_acc > best_acc:
+            best_acc = train_acc
             model.save(args.model_file)
         logger.info('Epoch %d took %.2f (s), train acc: %.2f, dev acc: %.2f '
                     % (stats['epoch'], epoch_time.time(), train_acc, dev_acc))
