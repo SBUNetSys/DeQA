@@ -30,12 +30,12 @@ class EarlyStoppingClassifier(nn.Module):
 
     def __init__(self):
         super(EarlyStoppingClassifier, self).__init__()
-        self.linear1 = nn.Linear(DIM, H)
-        self.linear2 = torch.nn.Linear(H, NUM_CLASS)
+        self.fc1 = nn.Linear(DIM, H)
+        self.fc2 = nn.Linear(H, NUM_CLASS)
 
     def forward(self, input_):
-        h_relu = self.linear1(input_).clamp(min=0)
-        return F.log_softmax(self.linear2(h_relu))
+        x = self.fc1(input_).clamp(min=0)
+        return F.log_softmax(self.fc2(x))
 
 
 class EarlyStoppingModel(object):
@@ -309,7 +309,7 @@ if __name__ == '__main__':
         torch.cuda.manual_seed(args.random_seed)
     # Set logging
     logger.setLevel(logging.INFO)
-    fmt = logging.Formatter('%(asctime)s.%(msecs)d: [ %(message)s ]', '%m/%d/%Y_%H:%M:%S')
+    fmt = logging.Formatter('%(asctime)s.%(msecs)03d: [ %(message)s ]', '%m/%d/%Y_%H:%M:%S')
     console = logging.StreamHandler()
     console.setFormatter(fmt)
     logger.addHandler(console)
@@ -353,8 +353,7 @@ if __name__ == '__main__':
             train_loss.update(*model.update(ex))
 
             if idx % 1000 == 0:
-                logger.info('epoch: %d, iter = %d/%d | ' %
-                            (stats['epoch'], idx, len(train_loader)) +
+                logger.info('  iter = %d/%d | ' % (idx, len(train_loader)) +
                             'loss = %.2f, elapsed time = %.2f (s)' %
                             (train_loss.avg, stats['timer'].time()))
                 train_loss.reset()
@@ -365,8 +364,8 @@ if __name__ == '__main__':
         if dev_acc > best_acc:
             best_acc = dev_acc
             model.save(args.model_file)
-        logger.info('Epoch %d took %.2f (s), train acc: %.2f, dev acc: %.2f '
+        logger.info('Epoch %-2d took %.2f (s), train acc: %.2f, dev acc: %.2f '
                     % (stats['epoch'], epoch_time.time(), train_acc, dev_acc))
         if args.checkpoint:
-            model.checkpoint(args.model_file + '.checkpoint.' + best_acc, epoch + 1)
+            model.checkpoint(args.model_file + '.checkpoint.%.2f' % best_acc, epoch + 1)
     logger.info('best_acc: %s' % best_acc)
