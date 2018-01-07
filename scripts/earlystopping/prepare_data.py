@@ -164,7 +164,7 @@ if __name__ == '__main__':
     else:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            missing, total, stop = process_record((data_line, prediction_line))
+            missing, total, stop = process_record(data_line, prediction_line)
             missing_count += missing
             stop_count += stop
             total_count += total
