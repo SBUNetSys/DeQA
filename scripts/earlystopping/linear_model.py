@@ -215,7 +215,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_seed', type=int, default=1013,
                         help=('Random seed for all numpy/torch/cuda '
                               'operations (for reproducibility)'))
-    parser.add_argument('--epochs', type=int, default=100,
+    parser.add_argument('--epochs', type=int, default=20,
                         help='Train data iterations')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training')
@@ -291,7 +291,7 @@ if __name__ == '__main__':
             train_loss.update(*model.update(ex))
 
             if idx % 1000 == 0:
-                logger.info('  iter = %d/%d | ' % (idx, len(train_loader)) +
+                logger.info('Epoch %-2d iter = %d/%d | ' % (stats['epoch'], idx, len(train_loader)) +
                             'loss = %.2f, elapsed time = %.2f (s)' %
                             (train_loss.avg, stats['timer'].time()))
                 train_loss.reset()
