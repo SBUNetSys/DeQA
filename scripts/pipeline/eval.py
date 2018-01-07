@@ -32,7 +32,8 @@ def evaluate(dataset_file, prediction_file, regex=False):
         for line in f:
             data = json.loads(line)
             if len(data):
-                prediction = normalize(data[0]['span'])
+                ranked_prediction = sorted(data, key=lambda k: -k['span_score'])
+                prediction = normalize(ranked_prediction[0]['span'])
             else:
                 prediction = ''
             predictions.append(prediction)
