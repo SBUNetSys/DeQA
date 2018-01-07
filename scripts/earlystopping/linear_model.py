@@ -265,9 +265,16 @@ class RecordDataset(Dataset):
             return ft
 
 
+def count_records(record_path=None):
+    import glob
+    if not record_path:
+        record_path = DEFAULTS['records']
+    return len(glob.glob("%s/*.pkl" % record_path))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--record_size', type=int, default=14000)
+    parser.add_argument('-r', '--record_size', type=int, default=count_records())
     # parser.add_argument('-r', '--record_file',
     #                     default='../../data/earlystopping/records-10.txt')
     # parser.add_argument('-w', '--weight_file', default='../../data/reader/multitask.mdl')
