@@ -8,10 +8,8 @@
 
 import torch
 import regex
-import heapq
 import math
 import json
-from collections import Counter
 import os
 from multiprocessing import Pool as ProcessPool
 from multiprocessing.util import Finalize
@@ -22,8 +20,9 @@ from .. import reader
 from .. import tokenizers
 from ..tokenizers.tokenizer import Tokenizer
 from . import DEFAULTS
+from .StoppingModel import EarlyStoppingModel
+from ..reader.utils import slugify, aggregate
 import logging
-from ..reader.utils import slugify
 import time
 
 logger = logging.getLogger(__name__)
@@ -112,6 +111,10 @@ class DrQA(object):
         self.reader = reader.DocReader.load(reader_model, normalize=False)
         t1 = time.time()
         logger.info('document reader model load [time]: %.4f s' % (t1 - t0))
+
+        logger.info('Initializing early stopping model...')
+        et_model = DEFAULTS['linear_model']
+        self.et_model = EarlyStoppingModel.load(et_model)
 
         if embedding_file:
             logger.info('embedding_file')
@@ -305,7 +308,21 @@ class DrQA(object):
 
             handle = self.reader.predict(batch, async_pool=self.processes)
             start, end, a_score, q_hidden, p_hidden, a_hidden = handle.get()
-
+            prediction = {
+                'doc_id': doc_id,
+                'start': int(start),
+                'end': int(end),
+                'span': s_tokens[sidx].slice(start, end + 1).untokenize(),
+                'doc_score': doc_score,
+                'span_score': a_score,
+            }
+            if return_context:
+                prediction['context'] = {
+                    'text': s_tokens[sidx].untokenize(),
+                    'start': s_tokens[sidx].offsets()[start][0],
+                    'end': s_tokens[sidx].offsets()[end][1],
+                }
+            predictions.append(prediction)
             n_p = [0 for _ in Tokenizer.FEAT]
             n_a = [0 for _ in Tokenizer.FEAT]
             for feat in p_ner[doc_id] + p_pos[doc_id]:
@@ -318,23 +335,21 @@ class DrQA(object):
             all_a_hidden.append(a_hidden)
             all_p_scores.append(doc_score)
             all_a_scores.append(a_score)
-
-            # TODO: feed features into early stopping model and decide whether to stop or not
-            prediction = {
-                'doc_id': doc_id,
-                'start': start,
-                'end': end,
-                'span': s_tokens[sidx].slice(start, end + 1).untokenize(),
-                'doc_score': doc_score,
-                'span_score': a_score,
-            }
-            if return_context:
-                prediction['context'] = {
-                    'text': s_tokens[sidx].untokenize(),
-                    'start': s_tokens[sidx].offsets()[start][0],
-                    'end': s_tokens[sidx].offsets()[end][1],
-                }
-            predictions.append(prediction)
+            f_sp = aggregate(all_p_scores)
+            f_sa = aggregate(all_a_scores)
+            f_nq = list(map(float, n_q))
+            f_np = aggregate(all_n_p)
+            f_na = aggregate(all_n_a)
+            f_hq = list(map(float, q_hidden))
+            f_hp = aggregate(all_p_hidden)
+            f_ha = aggregate(all_a_hidden)
+            et_input = torch.FloatTensor(f_sp + f_sa + f_nq + f_np + f_na + f_hq + f_hp + f_ha)
+            et_output = self.et_model.predict(et_input)
+            et_output = int(et_output.cpu().numpy())
+            if et_output == 0:
+                continue
+            else:
+                break
         t8 = time.time()
         logger.info('paragraphs predicted [time]: %.4f s' % (t8 - t7))
         all_predictions.append(predictions[-1::-1])
