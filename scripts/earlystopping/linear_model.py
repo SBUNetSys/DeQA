@@ -20,6 +20,7 @@ from drqa.pipeline import DEFAULTS
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
+H = 128
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
 DIM = 2*4 + 4 * (NLP_NUM * 2 + 768 * 2) + NLP_NUM + 768
@@ -29,10 +30,12 @@ class EarlyStoppingClassifier(nn.Module):
 
     def __init__(self):
         super(EarlyStoppingClassifier, self).__init__()
-        self.linear = nn.Linear(DIM, NUM_CLASS)
+        self.linear1 = nn.Linear(DIM, H)
+        self.linear2 = torch.nn.Linear(H, NUM_CLASS)
 
     def forward(self, input_):
-        return F.log_softmax(self.linear(input_))
+        h_relu = self.linear1(input_).clamp(min=0)
+        return F.log_softmax(self.linear2(h_relu))
 
 
 class EarlyStoppingModel(object):
@@ -109,7 +112,7 @@ class EarlyStoppingModel(object):
             total += batch_size
             preds_ = self.predict(batch_[0])
             labels_ = batch_[1]
-            correct += (preds_.numpy() == labels_.numpy()).sum()
+            correct += (preds_.numpy().flatten() == labels_.numpy().flatten()).sum()
 
             # sample max 10k
             if total >= 1e4:
