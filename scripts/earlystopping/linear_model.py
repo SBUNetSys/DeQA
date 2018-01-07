@@ -362,8 +362,8 @@ if __name__ == '__main__':
 
         train_acc = model.eval(train_loader)
         dev_acc = model.eval(dev_loader)
-        if train_acc > best_acc:
-            best_acc = train_acc
+        if dev_acc > best_acc:
+            best_acc = dev_acc
             model.save(args.model_file)
         logger.info('Epoch %d took %.2f (s), train acc: %.2f, dev acc: %.2f '
                     % (stats['epoch'], epoch_time.time(), train_acc, dev_acc))
