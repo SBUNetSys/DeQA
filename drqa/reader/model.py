@@ -257,7 +257,7 @@ class DocReader(object):
     # Prediction
     # --------------------------------------------------------------------------
 
-    def predict(self, ex, candidates=None, top_n=1, async_pool=None, q_a_id=None):
+    def predict(self, ex, candidates=None, top_n=1, async_pool=None):
         """Forward a batch of examples only to get predictions.
 
         Args:
@@ -293,10 +293,6 @@ class DocReader(object):
         # Decode predictions
         score_s = score_s.data.cpu()
         score_e = score_e.data.cpu()
-        q_hiddens = q_hiddens.data.cpu()
-        doc_hiddens = doc_hiddens.data.cpu()
-        doc_mask = inputs[2]
-        doc_mask = doc_mask.data.cpu()
         if candidates:
             args = (score_s, score_e, candidates, top_n, self.args.max_len)
             if async_pool:
@@ -304,14 +300,14 @@ class DocReader(object):
             else:
                 return self.decode_candidates(*args)
         else:
-            args = (score_s, score_e, top_n, self.args.max_len, q_a_id, q_hiddens, doc_hiddens, doc_mask)
+            args = (score_s, score_e, top_n, self.args.max_len)
             if async_pool:
                 return async_pool.apply_async(self.decode, args)
             else:
                 return self.decode(*args)
 
     @staticmethod
-    def decode(score_s, score_e, top_n=1, max_len=None, f_id=None, q_h=None, doc_h=None, mask=None):
+    def decode(score_s, score_e, top_n=1, max_len=None):
         """Take argmax of constrained score_s * score_e.
 
         Args:
@@ -324,16 +320,6 @@ class DocReader(object):
         pred_e = []
         pred_score = []
         max_len = max_len or score_s.size(1)
-        if f_id:
-            q_ids, doc_ids = f_id
-            q_h = q_h.numpy()
-            doc_h = doc_h.numpy()
-            mask = mask.numpy()
-        else:
-            q_ids, doc_ids = [], []
-            q_h = []
-            doc_h = []
-
         t1 = time.time()
         for i in range(score_s.size(0)):
             # Outer product of scores to get full p_s * p_e matrix
@@ -356,28 +342,6 @@ class DocReader(object):
             pred_s.append(s_idx)
             pred_e.append(e_idx)
             pred_score.append(scores_flat[idx_sort])
-
-            if i < len(q_ids):
-                q_id = q_ids[i]
-                doc_id = doc_ids[i]
-                q_hidden = q_h[i]
-                doc_hidden = doc_h[i]
-                d_mask = mask[i]
-
-                q_path = DEFAULTS['features'] + q_id
-                doc_path = DEFAULTS['features'] + q_id + '_' + doc_id
-                if not os.path.exists(q_path + '.npz'):
-                    np.savez_compressed(q_path, q_hidden=q_hidden)
-                if not os.path.exists(doc_path + '.npz'):
-                    d_merge_weights = layers.np_uniform_weights(doc_hidden, d_mask)
-                    doc_hi = layers.np_weighted_avg(doc_hidden, d_merge_weights)
-                    ans_hidden = doc_hidden[s_idx[0]:e_idx[0] + 1]
-                    a_mask = d_mask[s_idx[0]:e_idx[0] + 1]
-                    a_merge_weights = layers.np_uniform_weights(ans_hidden, a_mask)
-                    ans_h = layers.np_weighted_avg(ans_hidden, a_merge_weights)
-                    np.savez_compressed(doc_path, doc_hidden=doc_hi,
-                                        ans_hidden=ans_h)
-
         t2 = time.time()
         logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
         return pred_s, pred_e, pred_score
