@@ -68,9 +68,13 @@ class EarlyStoppingModel(object):
         # Run forward
         score_ = self.network(inputs)
 
-        # Compute loss and accuracies
+        # add regularization
+        l2_reg = Variable(torch.FloatTensor(1), requires_grad=True)
+        for W in self.network.parameters():
+            l2_reg = l2_reg + torch.pow(W, 2).sum()
 
-        loss = F.nll_loss(score_, target)
+        # Compute loss and accuracies
+        loss = F.nll_loss(score_, target) + 0.5 * l2_reg
 
         # Clear gradients and run backward
         self.optimizer.zero_grad()
