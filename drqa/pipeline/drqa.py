@@ -21,7 +21,8 @@ from .. import tokenizers
 from ..tokenizers.tokenizer import Tokenizer
 from . import DEFAULTS
 from .StoppingModel import EarlyStoppingModel
-from ..reader.utils import slugify, aggregate
+from ..retriever.utils import normalize
+from ..reader.utils import slugify, aggregate, exact_match_score, metric_max_over_ground_truths
 import logging
 import time
 
@@ -195,7 +196,7 @@ class DrQA(object):
         )
         return predictions[0]
 
-    def process_batch(self, queries, candidates=None, top_n=1, n_docs=5,
+    def process_batch(self, queries, answers, candidates=None, top_n=1, n_docs=5,
                       return_context=False):
         """Run a batch of queries (more efficient)."""
         t3 = time.time()
@@ -348,10 +349,13 @@ class DrQA(object):
             et_input = torch.FloatTensor(f_sp + f_sa + f_nq + f_np + f_na + f_hq + f_hp + f_ha)
             et_output = self.et_model.predict(et_input)
             et_output = int(et_output.cpu().numpy())
-            if et_output == 0:
-                continue
-            else:
+            span = s_tokens[sidx].slice(start, end + 1).untokenize()
+            exact_match = metric_max_over_ground_truths(exact_match_score, normalize(span), answers[0])
+            if exact_match:
+                print(et_output)
                 break
+            else:
+                continue
         t8 = time.time()
         logger.info('paragraphs predicted [time]: %.4f s' % (t8 - t7))
         all_predictions.append(predictions[-1::-1])

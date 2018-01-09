@@ -121,9 +121,11 @@ DrQA = pipeline.DrQA(
 
 logger.info('Loading queries from %s' % args.dataset)
 queries = []
+answers = []
 for line in open(args.dataset):
     data = json.loads(line)
     queries.append(data['question'])
+    answers.append(data['answer'])
 
 model = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
 basename = os.path.splitext(os.path.basename(args.dataset))[0]
@@ -133,12 +135,15 @@ logger.info('Writing results to %s' % outfile)
 with open(outfile, 'w') as f:
     batches = [queries[i: i + args.predict_batch_size]
                for i in range(0, len(queries), args.predict_batch_size)]
+    answer_batches = [answers[i: i + args.predict_batch_size]
+                      for i in range(0, len(queries), args.predict_batch_size)]
     for i, batch in enumerate(batches):
         logger.info(
             '-' * 25 + ' Batch %d/%d ' % (i + 1, len(batches)) + '-' * 25
         )
         predictions = DrQA.process_batch(
             batch,
+            answer_batches[i],
             n_docs=args.n_docs,
             top_n=args.top_n,
         )
