@@ -9,14 +9,12 @@ ENCODING = "utf-8"
 
 
 def get_rank(prediction_, answer_):
-    doc_scores = sorted([float(e['doc_score']) for e in prediction_], reverse=True)
-    for ans_rank_, entry in enumerate(prediction_):
+    prediction_ = sorted(prediction_, key=lambda k: -k['doc_score'])
+    for doc_rank_, entry in enumerate(prediction_):
         exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer_)
         if exact_match:
-            doc_score = float(entry['doc_score'])
-            doc_rank_ = doc_scores.index(doc_score)
-            return ans_rank_ + 1, doc_rank_ + 1
-    return 151, 151
+            return doc_rank_ + 1
+    return 1000
 
 
 if __name__ == '__main__':
@@ -24,7 +22,6 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--answer_file', type=str, default='data/datasets/SQuAD-v1.1-dev.txt')
     parser.add_argument('-p', '--prediction_file',
                         default='data/earlystopping/SQuAD-v1.1-dev-multitask-pipeline.preds')
-    parser.add_argument('-s', '--sort', action='store_true')
 
     args = parser.parse_args()
     answer_file = args.answer_file
@@ -37,15 +34,11 @@ if __name__ == '__main__':
         question = data['question']
         answer = [normalize(a) for a in data['answer']]
         prediction = json.loads(prediction_line)
-        if args.sort:
-            prediction = sorted(prediction, key=lambda k: -k['span_score'])
-        ans_rank, doc_rank = get_rank(prediction, answer)
-        if ans_rank > doc_rank:
-            proceed_count += 1
-            # print('q:', question, 'a:', answer, ans_rank, doc_rank)
-        ranks.append((ans_rank, doc_rank))
 
-    rank_counter = Counter([r[0] for r in ranks])
+        doc_rank = get_rank(prediction, answer)
+        ranks.append(doc_rank)
+
+    rank_counter = Counter(ranks)
     acc_rank = 0
     for rank in sorted(rank_counter.keys()):
         num = rank_counter.get(rank)
@@ -54,5 +47,3 @@ if __name__ == '__main__':
         acc_rate = acc_rank / len(ranks) * 100
         print('%s, %s, %.1f%%, %.1f%%' % (rank, rank_counter.get(rank), rate, acc_rate))
 
-    correct_count = acc_rank - rank_counter.get(151)
-    print('ans_rank > doc_rank', proceed_count, correct_count, '%.1f%%' % (proceed_count / correct_count * 100))
