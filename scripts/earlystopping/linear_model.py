@@ -91,8 +91,9 @@ if __name__ == '__main__':
     if args.eval:
         model = EarlyStoppingModel.load(args.model_file)
         logger.info('model loaded, begin evaluating...')
-        dev_acc = model.eval(dev_loader)
-        logger.info('eval acc: %.2f' % dev_acc)
+        dev_acc, dev_precision, dev_recall, dev_f1 = model.eval(dev_loader)
+        logger.info('eval acc: %.2f, precision: %.2f, recall: %.2f, f1: %.2f'
+                    % (dev_acc, dev_precision, dev_recall, dev_f1))
         exit(0)
     else:
         model = EarlyStoppingModel(args)
@@ -120,14 +121,16 @@ if __name__ == '__main__':
                 train_loss.reset()
                 gc.collect()
 
-        train_acc = model.eval(train_loader)
-        dev_acc = model.eval(dev_loader)
+        train_metric = model.eval(train_loader)
+        dev_acc, dev_precision, dev_recall, dev_f1 = model.eval(dev_loader)
         if dev_acc > best_acc:
             best_acc = dev_acc
             best_epoch = epoch
             model.save(args.model_file)
             if args.checkpoint:
                 model.checkpoint(args.model_file + '.checkpoint.%.2f_%d' % (best_acc, best_epoch), epoch + 1)
-        logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, best_acc:%.2f (%d)'
-                    % (stats['epoch'], epoch_time.time(), train_acc, dev_acc, best_acc, best_epoch))
+        logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, best_acc:%.2f (%d), '
+                    'precision: %.2f, recall: %.2f, f1: %.2f'
+                    % (stats['epoch'], epoch_time.time(), train_metric[0], dev_acc, best_acc, best_epoch
+                       , dev_precision, dev_recall, dev_f1))
     logger.info('best_acc: %s' % best_acc)

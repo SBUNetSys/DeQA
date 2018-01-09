@@ -108,19 +108,25 @@ class EarlyStoppingModel(object):
         return pred
 
     def eval(self, data_loader_):
-        total = 0
-        correct = 0
+        all_tp = 0
+        all_fp = 0
+        all_fn = 0
+        all_tn = 0
+        from sklearn.metrics import confusion_matrix as cm
         for batch_ in data_loader_:
-            batch_size = batch_[0].size(0)
-            total += batch_size
             preds_ = self.predict(batch_[0])
             labels_ = batch_[1]
-            correct += (preds_.numpy().flatten() == labels_.numpy().flatten()).sum()
+            tn, fp, fn, tp = cm(labels_.numpy().flatten(), preds_.numpy().flatten()).flatten()
+            all_tn += tn
+            all_fp += fp
+            all_fn += fn
+            all_tp += tp
 
-            # sample max 10k
-            if total >= 1e4:
-                break
-        return correct / total * 100
+        precision_ = all_tp / (all_tp + all_fp) * 100
+        recall_ = all_tp / (all_tp + all_fn) * 100
+        accuracy_ = (all_tp + all_tn) / (all_tp + all_tn + all_fp + all_fn) * 100
+        f1_ = 2 * precision_ * recall_ / (precision_ + recall_)
+        return accuracy_, precision_, recall_, f1_
 
     def init_optimizer(self):
         parameters = [p for p in self.network.parameters() if p.requires_grad]
