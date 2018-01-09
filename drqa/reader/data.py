@@ -118,7 +118,7 @@ class SortedBatchSampler(Sampler):
     def __iter__(self):
         lengths = np.array(
             [(-l[0], -l[1], np.random.random()) for l in self.lengths],
-            dtype=[('l1', np.int_), ('l2', np.int_), ('rand', np.float_)]
+            dtype=[('l1', np.float_), ('l2', np.int_), ('rand', np.float_)]
         )
         indices = np.argsort(lengths, order=('l1', 'l2', 'rand'))
         batches = [indices[i:i + self.batch_size]
