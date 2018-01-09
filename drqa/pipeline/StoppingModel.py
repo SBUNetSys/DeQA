@@ -32,7 +32,7 @@ class EarlyStoppingClassifier(nn.Module):
         self.fc1 = nn.Linear(DIM, NUM_CLASS)
 
     def forward(self, input_):
-        x = self.fc1(input_).clamp(min=0)
+        x = self.fc1(input_)
         return F.log_softmax(x)
 
 
@@ -61,15 +61,16 @@ class EarlyStoppingModel(object):
         if self.args.cuda:
             inputs = Variable(ex[0].cuda(async=True))
             target = Variable(ex[1].squeeze().cuda(async=True))
+            l2_reg = Variable(torch.FloatTensor(1).cuda(async=True), requires_grad=True)
         else:
             inputs = Variable(ex[0])
             target = Variable(ex[1].squeeze())
+            l2_reg = Variable(torch.FloatTensor(1), requires_grad=True)
 
         # Run forward
         score_ = self.network(inputs)
 
         # add regularization
-        l2_reg = Variable(torch.FloatTensor(1), requires_grad=True)
         for W in self.network.parameters():
             l2_reg = l2_reg + torch.pow(W, 2).sum()
 
