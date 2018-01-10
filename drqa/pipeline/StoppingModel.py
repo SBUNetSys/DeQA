@@ -81,7 +81,7 @@ class EarlyStoppingModel(object):
 
     def predict(self, inputs):
         self.network.eval()
-        if self.args.cuda:
+        if self.args.cuda and torch.cuda.is_available():
             inputs_var = Variable(inputs.cuda(async=True))
         else:
             inputs_var = Variable(inputs)
