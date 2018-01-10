@@ -117,20 +117,16 @@ def process_record(data_line_, prediction_line_, gap_):
         if not found_correct:
             found_correct = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
 
-        if found_correct:
-            record['stop'] = 1
-            stop_count_ += 1
+        if i % gap_ == 0:
+            if found_correct:
+                record['stop'] = 1
+                stop_count_ += 1
+            else:
+                record['stop'] = 0
             record_path = os.path.join(DEFAULTS['records'], '%s_%s.pkl' % (q_id, doc_id))
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
             total_count_ += 1
-        else:
-            if i % gap_ == 0:
-                record['stop'] = 0
-                record_path = os.path.join(DEFAULTS['records'], '%s_%s.pkl' % (q_id, doc_id))
-                with open(record_path, 'wb') as f:
-                    pk.dump(record, f)
-                total_count_ += 1
     return missing_count_, total_count_, stop_count_
 
 
@@ -140,7 +136,7 @@ if __name__ == '__main__':
                         default='data/earlystopping/SQuAD-v1.1-dev-100-multitask-pipeline.preds')
     parser.add_argument('-a', '--answer_file', default='data/datasets/SQuAD-v1.1-dev-100.txt')
     parser.add_argument('-m', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
-    parser.add_argument('-s', '--scale', type=int, default=5, help='scale factor for negative samples')
+    parser.add_argument('-s', '--scale', type=int, default=10, help='scale factor for negative samples')
 
     args = parser.parse_args()
 
@@ -176,7 +172,7 @@ if __name__ == '__main__':
             missing_count += missing
             stop_count += stop
             total_count += total
-            print('processed %d records...' % total_count)
+            print('processed %d records, stop: %d' % (total_count, stop_count))
             sys.stdout.flush()
 
     e = time.time()
