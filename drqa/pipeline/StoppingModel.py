@@ -74,18 +74,9 @@ class EarlyStoppingModel(object):
         # Clear gradients and run backward
         self.optimizer.zero_grad()
         loss.backward()
-
-        # Clip gradients
-        torch.nn.utils.clip_grad_norm(self.network.parameters(),
-                                      self.args.grad_clipping)
-
         # Update parameters
         self.optimizer.step()
         self.updates += 1
-
-        # # Reset any partially fixed parameters (e.g. rare words)
-        # self.reset_parameters()
-
         return loss.data[0], ex[0].size(0)
 
     def predict(self, inputs):
@@ -106,20 +97,22 @@ class EarlyStoppingModel(object):
         all_fp = 0
         all_fn = 0
         all_tn = 0
-        from sklearn.metrics import confusion_matrix as cm
         for batch_ in data_loader_:
             preds_ = self.predict(batch_[0])
-            labels_ = batch_[1]
-            tn, fp, fn, tp = cm(labels_.numpy().flatten(), preds_.numpy().flatten()).flatten()
+            labels_ = torch.squeeze(batch_[1])
+            tp = (preds_ * labels_).sum()
+            tn = ((1 - preds_) * (1 - labels_)).sum()
+            fp = (preds_ * (1 - labels_)).sum()
+            fn = ((1 - preds_) * labels_).sum()
             all_tn += tn
             all_fp += fp
             all_fn += fn
             all_tp += tp
 
-        precision_ = all_tp / (all_tp + all_fp) * 100
-        recall_ = all_tp / (all_tp + all_fn) * 100
-        accuracy_ = (all_tp + all_tn) / (all_tp + all_tn + all_fp + all_fn) * 100
-        f1_ = 2 * precision_ * recall_ / (precision_ + recall_)
+        precision_ = all_tp / (all_tp + all_fp + 1e-6) * 100
+        recall_ = all_tp / (all_tp + all_fn + 1e-6) * 100
+        accuracy_ = (all_tp + all_tn) / (all_tp + all_tn + all_fp + all_fn + 1e-6) * 100
+        f1_ = 2 * precision_ * recall_ / (precision_ + recall_ + 1e-6)
         return accuracy_, precision_, recall_, f1_
 
     def init_optimizer(self):
