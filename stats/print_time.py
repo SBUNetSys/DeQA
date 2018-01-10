@@ -7,7 +7,7 @@ ENCODING = "utf-8"
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-l', '--log_file', type=str, default='logs/trec_paras_150.log')
+    parser.add_argument('log_file', type=str, default='logs/trec_paras_150.log')
 
     args = parser.parse_args()
 
