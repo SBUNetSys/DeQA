@@ -61,21 +61,15 @@ class EarlyStoppingModel(object):
         if self.args.cuda:
             inputs = Variable(ex[0].cuda(async=True))
             target = Variable(ex[1].squeeze().cuda(async=True))
-            l2_reg = Variable(torch.FloatTensor(1).cuda(async=True), requires_grad=True)
         else:
             inputs = Variable(ex[0])
             target = Variable(ex[1].squeeze())
-            l2_reg = Variable(torch.FloatTensor(1), requires_grad=True)
 
         # Run forward
         score_ = self.network(inputs)
 
-        # add regularization
-        for W in self.network.parameters():
-            l2_reg = l2_reg + torch.pow(W, 2).sum()
-
         # Compute loss and accuracies
-        loss = F.nll_loss(score_, target) + 0.5 * l2_reg
+        loss = F.nll_loss(score_, target)
 
         # Clear gradients and run backward
         self.optimizer.zero_grad()
