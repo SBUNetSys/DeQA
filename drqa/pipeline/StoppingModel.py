@@ -57,6 +57,7 @@ class EarlyStoppingModel(object):
         # Train mode
         self.network.train()
 
+        logger.info('target 1:%d 0:%d' %(ex[1].sum(), ex[1].size(0) - ex[1].sum()))
         # Transfer to GPU
         if self.args.cuda:
             inputs = Variable(ex[0].cuda(async=True))
