@@ -44,7 +44,7 @@ class EarlyStoppingModel(object):
         self.network = EarlyStoppingClassifier()
         if state_dict_:
             self.network.load_state_dict(state_dict_)
-        if self.args.cuda:
+        if self.args.cuda and torch.cuda.is_available():
             self.network.cuda()
         if self.args.parallel:
             self.network = torch.nn.DataParallel(self.network)
