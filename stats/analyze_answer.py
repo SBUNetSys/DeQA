@@ -3,14 +3,18 @@ import json
 import argparse
 from collections import Counter
 from drqa.retriever.utils import normalize
-from drqa.reader.utils import exact_match_score, metric_max_over_ground_truths
+from drqa.reader.utils import exact_match_score, regex_match_score, metric_max_over_ground_truths
 
 ENCODING = "utf-8"
 
 
-def get_rank(prediction_, answer_):
+def get_rank(prediction_, answer_, use_regex_=False):
     for rank_, entry in enumerate(prediction_):
-        exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer_)
+        if use_regex_:
+            match_fn = regex_match_score
+        else:
+            match_fn = exact_match_score
+        exact_match = metric_max_over_ground_truths(match_fn, normalize(entry['span']), answer_)
         if exact_match:
             return rank_ + 1
     return 1000
@@ -21,7 +25,8 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--answer_file', type=str, default='data/datasets/SQuAD-v1.1-dev.txt')
     parser.add_argument('-p', '--prediction_file',
                         default='data/earlystopping/SQuAD-v1.1-dev-multitask-pipeline.preds')
-    parser.add_argument('-r', '--rank', choices=('doc_rank', 'ans_rank'), default='doc_rank')
+    parser.add_argument('-ans', '--answer_rank', action='store_true', help='default to use doc score rank')
+    parser.add_argument('-r', '--regex', action='store_true', help='default to use exact match')
     args = parser.parse_args()
     answer_file = args.answer_file
     prediction_file = args.prediction_file
@@ -33,11 +38,11 @@ if __name__ == '__main__':
         question = data['question']
         answer = [normalize(a) for a in data['answer']]
         prediction = json.loads(prediction_line)
-        if args.rank == 'doc_rank':
-            prediction = sorted(prediction, key=lambda k: -k['doc_score'])
-        else:
+        if args.answer_rank:
             prediction = sorted(prediction, key=lambda k: -k['span_score'])
-        doc_rank = get_rank(prediction, answer)
+        else:
+            prediction = sorted(prediction, key=lambda k: -k['doc_score'])
+        doc_rank = get_rank(prediction, answer, args.regex)
         ranks.append(doc_rank)
 
     rank_counter = Counter(ranks)
