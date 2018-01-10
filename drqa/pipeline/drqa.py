@@ -307,7 +307,7 @@ class DrQA(object):
             doc_id = all_docids[0][rel_didx]
             doc_score = float(all_doc_scores[0][rel_didx])
             if batch[0].size(1) <= 10:
-                print('too short, doc_id:', doc_id)
+                logger.info('too short paragraph, skip, doc_id: %s' % doc_id)
                 continue
             handle = self.reader.predict(batch, async_pool=self.processes)
             start, end, a_score, q_hidden, p_hidden, a_hidden = handle.get()
@@ -352,7 +352,7 @@ class DrQA(object):
             span = s_tokens[sidx].slice(start, end + 1).untokenize()
             exact_match = metric_max_over_ground_truths(exact_match_score, normalize(span), answers[0])
             if exact_match:
-                print(et_output)
+                logger.info(et_output)
                 break
             else:
                 continue
