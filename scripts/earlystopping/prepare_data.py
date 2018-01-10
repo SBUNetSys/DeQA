@@ -17,7 +17,7 @@ import time
 ENCODING = "utf-8"
 
 
-def process_record(data_line_, prediction_line_, gap_):
+def process_record(data_line_, prediction_line_, gap_, record_dir_):
     missing_count_ = 0
     total_count_ = 0
     stop_count_ = 0
@@ -123,7 +123,7 @@ def process_record(data_line_, prediction_line_, gap_):
                 stop_count_ += 1
             else:
                 record['stop'] = 0
-            record_path = os.path.join(DEFAULTS['records'], '%s_%s.pkl' % (q_id, doc_id))
+            record_path = os.path.join(record_dir_, '%s_%s.pkl' % (q_id, doc_id))
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
             total_count_ += 1
@@ -137,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--answer_file', default='data/datasets/SQuAD-v1.1-dev-100.txt')
     parser.add_argument('-m', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
     parser.add_argument('-s', '--scale', type=int, default=10, help='scale factor for negative samples')
+    parser.add_argument('-r', '--record_dir', default=DEFAULTS['records'])
 
     args = parser.parse_args()
 
@@ -146,14 +147,15 @@ if __name__ == '__main__':
 
     answer_file = args.answer_file
     prediction_file = args.prediction_file
-    if not os.path.exists(DEFAULTS['records']):
-        os.makedirs(DEFAULTS['records'])
+    record_dir = args.record_dir
+    if not os.path.exists(record_dir):
+        os.makedirs(record_dir)
 
     s = time.time()
     if args.no_multiprocess:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            missing, total, stop = process_record(data_line, prediction_line, args.scale)
+            missing, total, stop = process_record(data_line, prediction_line, args.scale, record_dir)
             missing_count += missing
             stop_count += stop
             total_count += total
@@ -165,7 +167,8 @@ if __name__ == '__main__':
         async_pool = ProcessPool()
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            handle = async_pool.apply_async(process_record, (data_line, prediction_line, args.scale))
+            param = (data_line, prediction_line, args.scale, record_dir)
+            handle = async_pool.apply_async(process_record, param)
             result_handles.append(handle)
         for result in result_handles:
             missing, total, stop = result.get()
