@@ -352,7 +352,7 @@ class DrQA(object):
             span = s_tokens[sidx].slice(start, end + 1).untokenize()
             exact_match = metric_max_over_ground_truths(exact_match_score, normalize(span), answers[0])
             if exact_match:
-                logger.info(et_output)
+                logger.info('found answer, model output: %d' % et_output)
                 break
             else:
                 continue
