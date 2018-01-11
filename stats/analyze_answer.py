@@ -27,6 +27,8 @@ if __name__ == '__main__':
                         default='data/earlystopping/SQuAD-v1.1-dev-multitask-pipeline.preds')
     parser.add_argument('-ans', '--answer_rank', action='store_true', help='default to use doc score rank')
     parser.add_argument('-r', '--regex', action='store_true', help='default to use exact match')
+    parser.add_argument('-d', '--draw', action='store_true', help='default not output draw data')
+
     args = parser.parse_args()
     answer_file = args.answer_file
     prediction_file = args.prediction_file
@@ -47,10 +49,17 @@ if __name__ == '__main__':
 
     rank_counter = Counter(ranks)
     acc_rank = 0
-    for rank in sorted(rank_counter.keys()):
-        num = rank_counter.get(rank)
+    if args.draw:
+        keys = range(1, 151, 1)
+    else:
+        keys = sorted(rank_counter.keys())
+    for rank in keys:
+        num = rank_counter.get(rank, 0)
         rate = num / len(ranks) * 100
         acc_rank += num
         acc_rate = acc_rank / len(ranks) * 100
-        print('%s, %s, %.1f%%, %.1f%%' % (rank, rank_counter.get(rank), rate, acc_rate))
+        if args.draw:
+            print('%.1f%%' % acc_rate)
+        else:
+            print('%s, %s, %.1f%%, %.1f%%' % (rank, rank_counter.get(rank), rate, acc_rate))
 
