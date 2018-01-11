@@ -104,7 +104,7 @@ if __name__ == '__main__':
     logger.info('-' * 50)
     logger.info('Starting training...')
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
-    best_acc = 0
+    best_f1 = 0
     best_epoch = 0
     for epoch in range(0, args.epochs):
         stats['epoch'] = epoch
@@ -123,14 +123,14 @@ if __name__ == '__main__':
 
         train_metric = model.eval(train_loader)
         dev_acc, dev_precision, dev_recall, dev_f1 = model.eval(dev_loader)
-        if dev_acc > best_acc:
-            best_acc = dev_acc
+        if dev_f1 > best_f1:
+            best_f1 = dev_f1
             best_epoch = epoch
             model.save(args.model_file)
             if args.checkpoint:
-                model.checkpoint(args.model_file + '.checkpoint.%.2f_%d' % (best_acc, best_epoch), epoch + 1)
-        logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, best_acc:%.2f (%d), '
-                    'precision: %.2f, recall: %.2f, f1: %.2f'
-                    % (stats['epoch'], epoch_time.time(), train_metric[0], dev_acc, best_acc, best_epoch
-                       , dev_precision, dev_recall, dev_f1))
-    logger.info('best_acc: %s' % best_acc)
+                model.checkpoint(args.model_file + '.checkpoint.%.2f_%d' % (best_f1, best_epoch), epoch + 1)
+        logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, '
+                    'precision: %.2f, recall: %.2f, f1: %.2f (best: %.2f at %d)'
+                    % (stats['epoch'], epoch_time.time(), train_metric[0], dev_acc
+                       , dev_precision, dev_recall, dev_f1, best_f1, best_epoch))
+    logger.info('best_f1: %s' % best_f1)
