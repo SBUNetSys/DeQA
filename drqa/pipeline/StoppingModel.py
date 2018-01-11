@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import argparse
 import os
 import torch
 import torch.nn as nn
@@ -9,17 +8,12 @@ import torch.optim as optim
 from torch.utils.data import Dataset
 from torch.autograd import Variable
 import logging
-import random
 import pickle as pk
-import glob
-import gc
 from drqa.tokenizers.tokenizer import Tokenizer
-from drqa.reader import utils
-from drqa.pipeline import DEFAULTS
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
-H = 128
+H = 32
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
 DIM = 2 * 4 + 4 * (NLP_NUM * 2 + 768 * 2) + NLP_NUM + 768
@@ -57,7 +51,6 @@ class EarlyStoppingModel(object):
         # Train mode
         self.network.train()
 
-        logger.info('target 1:%d 0:%d' %(ex[1].sum(), ex[1].size(0) - ex[1].sum()))
         # Transfer to GPU
         if self.args.cuda:
             inputs = Variable(ex[0].cuda(async=True))
