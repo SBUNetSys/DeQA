@@ -64,9 +64,10 @@ if __name__ == '__main__':
 
     records = glob.glob("%s/*.pkl" % args.record_dir)
     logger.info('found %d records' % len(records))
-    random.shuffle(records)
     divider = int(args.split_ratio * len(records))
-    train_dataset = RecordDataset(records[:divider], has_answer=True)
+    train_records = records[:divider]
+    random.shuffle(train_records)
+    train_dataset = RecordDataset(train_records, has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
