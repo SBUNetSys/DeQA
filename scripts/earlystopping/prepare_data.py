@@ -17,7 +17,7 @@ import time
 ENCODING = "utf-8"
 
 
-def process_record(data_line_, prediction_line_, gap_, record_dir_):
+def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_):
     missing_count_ = 0
     total_count_ = 0
     stop_count_ = 0
@@ -117,12 +117,20 @@ def process_record(data_line_, prediction_line_, gap_, record_dir_):
         if not found_correct:
             found_correct = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
 
-        if i % gap_ == 0:
-            if found_correct:
+        if found_correct:
+            if i % pos_gap_ == 0:
                 record['stop'] = 1
                 stop_count_ += 1
+                write_record = True
             else:
+                write_record = False
+        else:
+            if i % neg_gap_ == 0:
                 record['stop'] = 0
+                write_record = True
+            else:
+                write_record = False
+        if write_record:
             record_path = os.path.join(record_dir_, '%s_%s.pkl' % (q_id, doc_id))
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
@@ -136,7 +144,8 @@ if __name__ == '__main__':
                         default='data/earlystopping/SQuAD-v1.1-dev-100-multitask-pipeline.preds')
     parser.add_argument('-a', '--answer_file', default='data/datasets/SQuAD-v1.1-dev-100.txt')
     parser.add_argument('-m', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
-    parser.add_argument('-s', '--scale', type=int, default=10, help='scale factor for negative samples')
+    parser.add_argument('-ps', '--positive_scale', type=int, default=3, help='scale factor for positive samples')
+    parser.add_argument('-ns', '--negative_scale', type=int, default=10, help='scale factor for negative samples')
     parser.add_argument('-r', '--record_dir', default=DEFAULTS['records'])
 
     args = parser.parse_args()
@@ -155,7 +164,8 @@ if __name__ == '__main__':
     if args.no_multiprocess:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            missing, total, stop = process_record(data_line, prediction_line, args.scale, record_dir)
+            missing, total, stop = process_record(data_line, prediction_line,
+                                                  args.positive_scale, args.negative_scale, record_dir)
             missing_count += missing
             stop_count += stop
             total_count += total
@@ -167,7 +177,7 @@ if __name__ == '__main__':
         async_pool = ProcessPool()
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            param = (data_line, prediction_line, args.scale, record_dir)
+            param = (data_line, prediction_line, args.positive_scale, args.negative_scale, record_dir)
             handle = async_pool.apply_async(process_record, param)
             result_handles.append(handle)
         for result in result_handles:
