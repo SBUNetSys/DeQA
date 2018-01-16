@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 """Documents, in a sqlite database."""
 
-import sqlite3
+import apsw
 import logging
 
 from multiprocessing.pool import ThreadPool
@@ -23,11 +23,9 @@ class SqliteRanker(object):
     Implements get_doc_text(doc_id).
     """
 
-    def __init__(self, db_path=None, ext_path='data/okapi_bm25.sqlext'):
-        self.path = db_path or DEFAULTS['sql_path']
-        self.connection = sqlite3.connect(self.path, check_same_thread=False)
-        self.connection.enable_load_extension(True)
-        self.connection.load_extension(ext_path)
+    def __init__(self, db_path=None):
+        self.path = db_path or DEFAULTS['wiki_idx_db']
+        self.conn = apsw.Connection(self.path)
 
     def __enter__(self):
         return self
@@ -41,7 +39,7 @@ class SqliteRanker(object):
 
     def close(self):
         """Close the connection to the database."""
-        self.connection.close()
+        self.conn.close()
 
     def closest_docs(self, question, k=5):
         """Closest docs by dot product between query and documents
@@ -52,24 +50,19 @@ class SqliteRanker(object):
         for keyword_item in keyword_items:
             keyword, _ = keyword_item
             # keyword_query = '#od:1( %s )' % keyword if ' ' in keyword else keyword
-            keyword_query = keyword.replace('-', ' ')
+            keyword_query = keyword.replace('-', ' ').replace('#', '')
             word_queries.append(keyword_query)
-        query = ' '.join(word_queries)
-
-        sql = '''
-              select id, okapi_bm25(matchinfo(wiki, 'pcnalx'), 1) as rank, text
-              from wiki where wiki match :query
-              order by rank desc limit :number
-            '''
-        search_results = self.connection.execute(sql, {'query': query, 'number': k})
-        doc_scores = []
-        doc_ids = []
-        doc_texts = []
-        for row in search_results:
-            doc_id, doc_score, doc_text = row
-            doc_ids.append(doc_id)
-            doc_scores.append(doc_score)
-            doc_texts.append(doc_text)
+        query = ','.join(word_queries)
+        logger.info('question:%s, query:%s' % (question, query))
+        sql = '''select id, bm25(wiki, 1, 3.0) as rank, text
+              from wiki where wiki match :query 
+              order by rank desc limit :number'''
+        cursor = self.conn.cursor()
+        search_results = cursor.execute(sql, {'query': query, 'number': k})
+        ids, ss, ts = tuple(zip(*search_results))
+        doc_ids = list(ids)
+        doc_scores = list(ss)
+        doc_texts = list(ts)
         logger.info('question:%s, query:%s, doc_ids:%s' % (question, query, ';'.join(doc_ids)))
         return doc_ids, doc_scores, doc_texts
 

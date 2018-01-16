@@ -108,7 +108,7 @@ if __name__ == '__main__':
     parser.add_argument('--tokenizer', type=str, default='regexp')
     parser.add_argument('--use_keyword', action='store_true')
     parser.add_argument('--n-docs', type=int, default=5)
-    parser.add_argument('--num-workers', type=int, default=None)
+    parser.add_argument('--num-workers', type=int, default=os.cpu_count())
     parser.add_argument('--match', type=str, default='string',
                         choices=['regex', 'string'])
     args = parser.parse_args()
