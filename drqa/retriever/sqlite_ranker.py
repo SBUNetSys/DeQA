@@ -50,19 +50,27 @@ class SqliteRanker(object):
         for keyword_item in keyword_items:
             keyword, _ = keyword_item
             # keyword_query = '#od:1( %s )' % keyword if ' ' in keyword else keyword
-            keyword_query = keyword.replace('-', ' ').replace('#', '')
-            word_queries.append(keyword_query)
-        query = ','.join(word_queries)
+            keyword_query = keyword.replace('-', ' ').replace('^', '')
+            word_queries.append('"%s"' % keyword_query)
+        query = ' OR '.join(word_queries[:2])
         logger.info('question:%s, query:%s' % (question, query))
         sql = '''select id, bm25(wiki, 1, 3.0) as rank, text
               from wiki where wiki match :query 
               order by rank desc limit :number'''
         cursor = self.conn.cursor()
         search_results = cursor.execute(sql, {'query': query, 'number': k})
-        ids, ss, ts = tuple(zip(*search_results))
-        doc_ids = list(ids)
-        doc_scores = list(ss)
-        doc_texts = list(ts)
+        # ids, ss, ts = tuple(zip(*search_results))
+        # doc_ids = list(ids)
+        # doc_scores = list(ss)
+        # doc_texts = list(ts)
+        doc_scores = []
+        doc_ids = []
+        doc_texts = []
+        for row in search_results:
+            doc_id, doc_score, doc_text = row
+            doc_ids.append(doc_id)
+            doc_scores.append(doc_score)
+            doc_texts.append(doc_text)
         logger.info('question:%s, query:%s, doc_ids:%s' % (question, query, ';'.join(doc_ids)))
         return doc_ids, doc_scores, doc_texts
 
