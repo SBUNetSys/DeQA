@@ -113,7 +113,7 @@ def store_contents(data_path, save_path, preprocess, num_workers=None):
     conn = apsw.Connection(save_path)
 
     c = conn.cursor()
-    c.execute("CREATE VIRTUAL TABLE wiki USING fts5(id, title, text, tokenize = 'porter ascii');")
+    c.execute("CREATE VIRTUAL TABLE wiki USING fts4(id, title, text);")
 
     workers = ProcessPool(num_workers, initializer=init, initargs=(preprocess,))
     files = [f for f in iter_files(data_path)]
