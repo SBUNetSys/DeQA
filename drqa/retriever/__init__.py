@@ -9,11 +9,11 @@ import os
 from .. import DATA_DIR
 
 DEFAULTS = {
-    'wiki_idx_db': os.path.join(DATA_DIR, 'wikipedia/enwiki_idx.db'),
+    'wiki_idx_db': os.path.join(DATA_DIR, 'wikipedia/wiki_idx.db'),
     'db_path': os.path.join(DATA_DIR, 'wikipedia/docs.db'),
     'tfidf_path': os.path.join(DATA_DIR, 'wikipedia/tfidf-'),
     'galago_path': os.path.join(DATA_DIR, 'galago/bin/galago'),
-    'galago_index': os.path.join(DATA_DIR, 'wikipedia/galago-idx')
+    'galago_index': os.path.join(DATA_DIR, 'wikipedia/wiki-idx-20171103/')
 }
 
 
