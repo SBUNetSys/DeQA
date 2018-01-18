@@ -13,7 +13,7 @@ DEFAULTS = {
     'db_path': os.path.join(DATA_DIR, 'wikipedia/docs.db'),
     'tfidf_path': os.path.join(DATA_DIR, 'wikipedia/tfidf-'),
     'galago_path': os.path.join(DATA_DIR, 'galago/bin/galago'),
-    'galago_index': os.path.join(DATA_DIR, 'wikipedia/galago-idx')
+    'galago_index': os.path.join(DATA_DIR, 'wikipedia/wiki-idx-20171103/')
 }
 
 

@@ -26,7 +26,7 @@ logger.addHandler(console)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('dataset', type=str)
-parser.add_argument('--out-dir', type=str, default='/tmp',
+parser.add_argument('--out-suffix', type=str, default='.preds',
                     help=("Directory to write prediction file to "
                           "(<dataset>-<model>-pipeline.preds)"))
 parser.add_argument('--reader-model', type=str, default=None,
@@ -41,9 +41,9 @@ parser.add_argument('--embedding-file', type=str, default=None,
 parser.add_argument('--candidate-file', type=str, default=None,
                     help=("List of candidates to restrict predictions to, "
                           "one candidate per line"))
-parser.add_argument('--n-docs', type=int, default=5,
+parser.add_argument('--n-docs', type=int, default=150,
                     help="Number of docs to retrieve per query")
-parser.add_argument('--top-n', type=int, default=1,
+parser.add_argument('--top-n', type=int, default=150,
                     help="Number of predictions to make per query")
 parser.add_argument('--tokenizer', type=str, default='simple',
                     help=("String option specifying tokenizer type to use "
@@ -58,7 +58,7 @@ parser.add_argument('--num-workers', type=int, default=None,
                     help='Number of CPU processes (for tokenizing, etc)')
 parser.add_argument('--batch-size', type=int, default=128,
                     help='Document paragraph batching size')
-parser.add_argument('--predict-batch-size', type=int, default=1000,
+parser.add_argument('--predict-batch-size', type=int, default=1,
                     help='Question batching size')
 parser.add_argument('--no_galago', action='store_false')
 parser.add_argument("-v", "--verbose", help="log more debug info",
@@ -77,8 +77,6 @@ if args.cuda:
 else:
     logger.info('Running on CPU only.')
 
-if not os.path.exists(args.out_dir):
-    os.makedirs(args.out_dir)
 
 if args.candidate_file:
     logger.info('Loading candidates from %s' % args.candidate_file)
@@ -127,7 +125,8 @@ for line in open(args.dataset):
 
 model = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
 basename = os.path.splitext(os.path.basename(args.dataset))[0]
-outfile = os.path.join(args.out_dir, basename + '-' + model + '-pipeline.preds')
+out_dir = os.path.dirname(args.dataset)
+outfile = os.path.join(out_dir, basename + '-' + args.out_suffix)
 
 logger.info('Writing results to %s' % outfile)
 with open(outfile, 'w') as f:
