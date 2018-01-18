@@ -52,12 +52,12 @@ class SqliteRanker(object):
         for keyword_item in keyword_items:
             keyword, _ = keyword_item
             # keyword_query = '#od:1( %s )' % keyword if ' ' in keyword else keyword
-            keyword_query = keyword.replace('-', ' ')
-            word_queries.append(keyword_query)
-        query = ' '.join(word_queries)
+            keyword_query = keyword.replace('-', ' ').replace('^', '')
+            word_queries.append('"%s"' % keyword_query)
+        query = ' OR '.join(word_queries[:2])
 
         sql = '''
-              select id, okapi_bm25(matchinfo(wiki, 'pcnalx'), 1) as rank, text
+              select id, okapi_bm25(matchinfo(wiki, 'pcnalx'), 2) as rank, text
               from wiki where wiki match :query
               order by rank desc limit :number
             '''
