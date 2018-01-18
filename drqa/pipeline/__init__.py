@@ -15,7 +15,7 @@ DEFAULTS = {
     'ranker': TfidfDocRanker,
     'reader_model': os.path.join(DATA_DIR, 'reader/multitask.mdl'),
     'linear_model': os.path.join(DATA_DIR, 'earlystopping/linear_model.mdl'),
-    'features': os.path.join(DATA_DIR, 'earlystopping/features/')
+    'features': os.path.join(os.path.expanduser('~'), 'features/')
 }
 
 
