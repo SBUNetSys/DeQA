@@ -31,13 +31,13 @@ if __name__ == '__main__':
                         help='Train data iterations')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training')
-    parser.add_argument('--optimizer', type=str, default='adamax',
+    parser.add_argument('--optimizer', type=str, default='sgd',
                         help='Optimizer: sgd or adamax')
     parser.add_argument('--learning_rate', type=float, default=0.1,
                         help='Learning rate for SGD only')
     parser.add_argument('--grad_clipping', type=float, default=10,
                         help='Gradient clipping')
-    parser.add_argument('--weight_decay', type=float, default=0,
+    parser.add_argument('--weight_decay', type=float, default=0.2,
                         help='Weight decay factor')
     parser.add_argument('--split_ratio', type=float, default=0.7,
                         help='ratio of train/dev')
@@ -65,8 +65,8 @@ if __name__ == '__main__':
     records = glob.glob("%s/*.pkl" % args.record_dir)
     logger.info('found %d records' % len(records))
     divider = int(args.split_ratio * len(records))
+    random.shuffle(records)
     train_records = records[:divider]
-    random.shuffle(train_records)
     train_dataset = RecordDataset(train_records, has_answer=True)
     train_sampler = torch.utils.data.sampler.RandomSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
@@ -95,6 +95,20 @@ if __name__ == '__main__':
         dev_acc, dev_precision, dev_recall, dev_f1 = model.eval(dev_loader)
         logger.info('eval acc: %.2f, precision: %.2f, recall: %.2f, f1: %.2f'
                     % (dev_acc, dev_precision, dev_recall, dev_f1))
+        # csv_path = os.path.join(os.path.expanduser('~'), 'data.csv')
+        # with open(csv_path, 'w') as f:
+        #     for j, batch_ in enumerate(dev_loader):
+        #         batch_x = batch_[0]
+        #         batch_y = batch_[1]
+        #         for i, b in enumerate(zip(batch_x, batch_y)):
+        #             x, y = b
+        #             no = i + j * len(batch_x)
+        #             line = '%d, %d, %s' % (no, y.numpy(), ','.join(['%.5f' % num for num in x.numpy()]))
+        #             f.write(line + '\n')
+        #             if no % 100 == 0:
+        #                 logger.info('saved no: %d' % no)
+        #             if no == 1000:
+        #                 exit(0)
         exit(0)
     else:
         model = EarlyStoppingModel(args)

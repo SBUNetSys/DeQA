@@ -53,16 +53,16 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
     found_correct = False
     all_n_p = []
     all_n_a = []
-    all_p_hidden = []
+    # all_p_hidden = []
     all_a_hidden = []
     all_p_scores = []
-    all_a_scores = []
+    # all_a_scores = []
     for i, entry in enumerate(ranked_prediction):
         doc_id = entry['doc_id']
         start = int(entry['start'])
         end = int(entry['end'])
         doc_score = entry['doc_score']
-        ans_score = entry['span_score']
+        # ans_score = entry['span_score']
 
         p_pos = dict()
         p_ner = dict()
@@ -81,7 +81,7 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
         p_h_path = os.path.join(DEFAULTS['features'], '%s_%s.npz' % (q_id, doc_id))
         if os.path.exists(p_h_path):
             p_h_data = np.load(p_h_path)
-            p_h = p_h_data['doc_hidden']
+            # p_h = p_h_data['doc_hidden']
             a_h = p_h_data['ans_hidden']
         else:
             print('paragraph hidden file %s not exist!' % p_h_path)
@@ -90,29 +90,31 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
             continue
         all_n_p.append(n_p)
         all_n_a.append(n_a)
-        all_p_hidden.append(p_h)
+        # all_p_hidden.append(p_h)
         all_a_hidden.append(a_h)
         all_p_scores.append(doc_score)
-        all_a_scores.append(ans_score)
+        # all_a_scores.append(ans_score)
 
         f_np = aggregate(all_n_p)
         f_na = aggregate(all_n_a)
         f_sp = aggregate(all_p_scores)
-        f_sa = aggregate(all_a_scores)
-        f_hp = aggregate(all_p_hidden)
+        # f_sa = aggregate(all_a_scores)
+        # f_hp = aggregate(all_p_hidden)
         f_ha = aggregate(all_a_hidden)
 
         record = OrderedDict()
-        record['q'] = question
-        record['a'] = normalize(entry['span'])
+        # record['q'] = question
+        # record['a'] = normalize(entry['span'])
+
+        # sp, nq, np, na, ha
+        record['sp'] = f_sp
+        record['nq'] = list(map(float, n_q))
         record['np'] = f_np
         record['na'] = f_na
-        record['sp'] = f_sp
-        record['sa'] = f_sa
-        record['hp'] = f_hp
         record['ha'] = f_ha
-        record['nq'] = list(map(float, n_q))
-        record['hq'] = list(map(float, q_h))
+        # record['sa'] = f_sa
+        # record['hp'] = f_hp
+        # record['hq'] = list(map(float, q_h))
 
         if not found_correct:
             found_correct = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)

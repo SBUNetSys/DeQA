@@ -174,18 +174,19 @@ class RecordDataset(Dataset):
             record_data = pk.load(open(record_, "rb"))
         else:
             print('warning: %s not exist!' % record_)
-        sp = torch.FloatTensor(record_data['sp'])
-        sa = torch.FloatTensor(record_data['sa'])
+        sp = torch.FloatTensor(record_data['sp'])  # 4x1
+        # sa = torch.FloatTensor(record_data['sa'])
 
-        np = torch.FloatTensor(record_data['np'])
-        na = torch.FloatTensor(record_data['na'])
-        nq = torch.FloatTensor(record_data['nq'])
+        np = torch.FloatTensor(record_data['np'])  # 4x58
+        na = torch.FloatTensor(record_data['na'])  # 4x58
+        nq = torch.FloatTensor(record_data['nq'])  # 4x58
 
-        hq = torch.FloatTensor(record_data['hq'])
-        hp = torch.FloatTensor(record_data['hp'])
-        ha = torch.FloatTensor(record_data['ha'])
+        # hq = torch.FloatTensor(record_data['hq'])
+        # hp = torch.FloatTensor(record_data['hp'])
+        ha = torch.FloatTensor(record_data['ha'])  # 4x768
 
-        ft = torch.cat([sp, sa, nq, np, na, hq, hp, ha])
+        # ft = torch.cat([sp, sa, nq, np, na, hq, hp, ha])
+        ft = torch.cat([sp, nq, np, na, ha])
 
         if has_label:
             label = record_data['stop']
