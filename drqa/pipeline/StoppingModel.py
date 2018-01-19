@@ -16,7 +16,7 @@ ENCODING = "utf-8"
 H = 32
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
-DIM = 2 * 4 + 4 * (NLP_NUM * 2 + 768 * 2) + NLP_NUM + 768
+DIM = 1 * 4 + 4 * NLP_NUM * 3 + 768 * 4
 
 
 class EarlyStoppingClassifier(nn.Module):
