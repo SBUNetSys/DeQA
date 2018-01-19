@@ -16,7 +16,7 @@ ENCODING = "utf-8"
 H = 32
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
-DIM = 1 * 4 + 4 * NLP_NUM * 3 + 768 * 4
+DIM = 1 * 4 + 4 * NLP_NUM * 2 + 768 * 4 + NLP_NUM
 
 
 class EarlyStoppingClassifier(nn.Module):
@@ -179,7 +179,7 @@ class RecordDataset(Dataset):
 
         np = torch.FloatTensor(record_data['np'])  # 4x58
         na = torch.FloatTensor(record_data['na'])  # 4x58
-        nq = torch.FloatTensor(record_data['nq'])  # 4x58
+        nq = torch.FloatTensor(record_data['nq'])  # 1x58
 
         # hq = torch.FloatTensor(record_data['hq'])
         # hp = torch.FloatTensor(record_data['hp'])
