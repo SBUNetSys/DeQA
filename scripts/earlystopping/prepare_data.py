@@ -38,15 +38,15 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
         sys.stdout.flush()
         missing_count_ += 1
         return missing_count_, total_count_, stop_count_
-    q_h_path = os.path.join(DEFAULTS['features'], '%s.npz' % q_id)
-
-    if os.path.exists(q_h_path):
-        q_h_data = np.load(q_h_path)
-        q_h = q_h_data['q_hidden']
-    else:
-        print('question hidden file %s not exist!' % q_h_path)
-        sys.stdout.flush()
-        return missing_count_, total_count_, stop_count_
+    # q_h_path = os.path.join(DEFAULTS['features'], '%s.npz' % q_id)
+    #
+    # if os.path.exists(q_h_path):
+    #     q_h_data = np.load(q_h_path)
+    #     q_h = q_h_data['q_hidden']
+    # else:
+    #     print('question hidden file %s not exist!' % q_h_path)
+    #     sys.stdout.flush()
+    #     return missing_count_, total_count_, stop_count_
     answer = [normalize(a) for a in data['answer']]
     prediction = json.loads(prediction_line_)
     ranked_prediction = sorted(prediction, key=lambda k: k['doc_score'])

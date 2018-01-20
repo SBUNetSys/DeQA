@@ -175,7 +175,7 @@ class RecordDataset(Dataset):
         else:
             print('warning: %s not exist!' % record_)
         sp = torch.FloatTensor(record_data['sp'])  # 4x1
-        # sa = torch.FloatTensor(record_data['sa'])
+        # sa = torch.FloatTensor(record_data['sa'])  # 4x1
 
         np = torch.FloatTensor(record_data['np'])  # 4x58
         na = torch.FloatTensor(record_data['na'])  # 4x58

@@ -27,17 +27,17 @@ if __name__ == '__main__':
     parser.add_argument('--random_seed', type=int, default=1013,
                         help=('Random seed for all numpy/torch/cuda '
                               'operations (for reproducibility)'))
-    parser.add_argument('--epochs', type=int, default=20,
+    parser.add_argument('--epochs', type=int, default=200,
                         help='Train data iterations')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training')
-    parser.add_argument('--optimizer', type=str, default='sgd',
+    parser.add_argument('--optimizer', type=str, default='adamax',
                         help='Optimizer: sgd or adamax')
     parser.add_argument('--learning_rate', type=float, default=0.1,
                         help='Learning rate for SGD only')
     parser.add_argument('--grad_clipping', type=float, default=10,
                         help='Gradient clipping')
-    parser.add_argument('--weight_decay', type=float, default=0.2,
+    parser.add_argument('--weight_decay', type=float, default=0.5,
                         help='Weight decay factor')
     parser.add_argument('--split_ratio', type=float, default=0.7,
                         help='ratio of train/dev')
@@ -129,13 +129,6 @@ if __name__ == '__main__':
         for idx, ex in enumerate(train_loader):
             train_loss.update(*model.update(ex))
 
-            if idx % 1000 == 0:
-                logger.info('Epoch %-2d iter = %d/%d | ' % (stats['epoch'], idx, len(train_loader)) +
-                            'loss = %.2f, elapsed time = %.2f (s)' %
-                            (train_loss.avg, stats['timer'].time()))
-                train_loss.reset()
-                gc.collect()
-
         train_metric = model.eval(train_loader)
         dev_acc, dev_precision, dev_recall, dev_f1 = model.eval(dev_loader)
         if dev_f1 > best_f1:
@@ -144,8 +137,11 @@ if __name__ == '__main__':
             model.save(args.model_file)
             if args.checkpoint:
                 model.checkpoint(args.model_file + '.checkpoint.%.2f_%d' % (best_f1, best_epoch), epoch + 1)
-        logger.info('Epoch %-2d took %.2f (s), train_acc:%.2f, dev_acc:%.2f, '
-                    'precision: %.2f, recall: %.2f, f1: %.2f (best: %.2f at %d)'
-                    % (stats['epoch'], epoch_time.time(), train_metric[0], dev_acc
-                       , dev_precision, dev_recall, dev_f1, best_f1, best_epoch))
+        logger.info('Epoch %-2d loss:%.4f, train_acc:%.2f, dev_acc:%.2f, '
+                    'precision:%.2f, recall:%.2f, f1:%.2f(best:%.2f at %d), took:%.2f(s), elapsed:%.2f(s)'
+                    % (stats['epoch'], train_loss.avg, train_metric[0], dev_acc
+                       , dev_precision, dev_recall, dev_f1, best_f1, best_epoch,
+                       epoch_time.time(), stats['timer'].time()))
+        train_loss.reset()
+
     logger.info('best_f1: %s' % best_f1)
