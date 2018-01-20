@@ -17,7 +17,7 @@ ENCODING = "utf-8"
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--record_dir', default=DEFAULTS['records'])
-    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('-e', '--eval', action='store_true')
     parser.add_argument('--no_cuda', action='store_true',
                         help='Train on CPU, even if GPUs are available.')
     parser.add_argument('--data_workers', type=int, default=int(os.cpu_count() / 2),
@@ -32,20 +32,18 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training')
     parser.add_argument('--optimizer', type=str, default='adamax',
-                        help='Optimizer: sgd or adamax')
+                        help='Optimizer: sgd or adamax(gives better training performance')
     parser.add_argument('--learning_rate', type=float, default=0.1,
                         help='Learning rate for SGD only')
-    parser.add_argument('--grad_clipping', type=float, default=10,
-                        help='Gradient clipping')
-    parser.add_argument('--weight_decay', type=float, default=0.5,
-                        help='Weight decay factor')
-    parser.add_argument('--split_ratio', type=float, default=0.7,
-                        help='ratio of train/dev')
     parser.add_argument('--momentum', type=float, default=0,
-                        help='Momentum factor')
-    parser.add_argument('--model_file', type=str, default=DEFAULTS['linear_model'],
+                        help='Momentum factor for SGD only')
+    parser.add_argument('--weight_decay', type=float, default=0.001,
+                        help='Weight decay factor')
+    parser.add_argument('--split_ratio', type=float, default=0.8,
+                        help='ratio of train/dev')
+    parser.add_argument('-m', '--model_file', type=str, default=DEFAULTS['linear_model'],
                         help='Unique model identifier (.mdl, .txt, .checkpoint)')
-    parser.add_argument('--checkpoint', type=bool, default=True,
+    parser.add_argument('--checkpoint', type=bool, default=False,
                         help='Save model + optimizer state after each epoch')
     args = parser.parse_args()
 
@@ -144,4 +142,7 @@ if __name__ == '__main__':
                        epoch_time.time(), stats['timer'].time()))
         train_loss.reset()
 
-    logger.info('best_f1: %s' % best_f1)
+    model_name, ext = os.path.splitext(args.model_file)
+    final_model_file = '%s_%s%s' % (model_name, best_f1, ext)
+    os.rename(args.model_file, final_model_file)
+    logger.info('best_f1: %.2f' % best_f1)
