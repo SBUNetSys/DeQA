@@ -261,6 +261,7 @@ class DrQA(object):
         else:
             logger.warning('no question ner and pos file: %s' % q_feat_file)
 
+        f_nq = list(map(float, n_q))
         para_lens = []
         p_pos = dict()
         p_ner = dict()
@@ -296,10 +297,7 @@ class DrQA(object):
 
         all_n_p = []
         all_n_a = []
-        all_p_hidden = []
-        all_a_hidden = []
         all_p_scores = []
-        all_a_scores = []
         for batch in self._get_loader(examples, num_loaders):
             ids = batch[-1][0]
             rel_didx, sidx = ids
@@ -309,7 +307,7 @@ class DrQA(object):
                 logger.info('too short paragraph, skip, doc_id: %s' % doc_id)
                 continue
             handle = self.reader.predict(batch, async_pool=self.processes)
-            start, end, a_score, q_hidden, p_hidden, a_hidden = handle.get()
+            start, end, a_score = handle.get()
             prediction = {
                 'doc_id': doc_id,
                 'start': int(start),
@@ -333,22 +331,14 @@ class DrQA(object):
                 n_a[Tokenizer.FEAT_DICT[feat]] += 1
             all_n_p.append(n_p)
             all_n_a.append(n_a)
-            all_p_hidden.append(p_hidden)
-            all_a_hidden.append(a_hidden)
             all_p_scores.append(doc_score)
-            all_a_scores.append(a_score)
             f_sp = aggregate(all_p_scores)
-            f_sa = aggregate(all_a_scores)
-            f_nq = list(map(float, n_q))
             f_np = aggregate(all_n_p)
             f_na = aggregate(all_n_a)
-            f_hq = list(map(float, q_hidden))
-            f_hp = aggregate(all_p_hidden)
-            f_ha = aggregate(all_a_hidden)
-            et_input = torch.FloatTensor(f_sp + f_sa + f_nq + f_np + f_na + f_hq + f_hp + f_ha)
-            et_output = self.et_model.predict(et_input)
-            et_output = int(et_output.cpu().numpy())
-            if et_output == 0:
+            et_input = torch.FloatTensor(f_sp + f_nq + f_np + f_na)
+            et_output = self.et_model.predict(et_input, prob=True)
+            et_prob = float(et_output.cpu().numpy())
+            if et_prob <= 0.5:
                 continue
             else:
                 break

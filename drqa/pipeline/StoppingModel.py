@@ -73,7 +73,7 @@ class EarlyStoppingModel(object):
         self.updates += 1
         return loss.data[0], ex[0].size(0)
 
-    def predict(self, inputs):
+    def predict(self, inputs, prob=False):
         self.network.eval()
         if self.args.cuda and torch.cuda.is_available():
             inputs_var = Variable(inputs.cuda(async=True))
@@ -83,8 +83,12 @@ class EarlyStoppingModel(object):
         score_ = self.network(inputs_var)
         score = score_.data.cpu()
         dim = 0 if len(score.size()) == 1 else 1
-        _, pred = torch.max(score, dim)
-        return pred
+        _, predicted_score = torch.max(score, dim)
+        if prob:
+            # return stop probability
+            return torch.exp(score[:, 1])
+        else:
+            return predicted_score
 
     def eval(self, data_loader_):
         all_tp = 0
