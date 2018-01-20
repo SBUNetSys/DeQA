@@ -37,7 +37,7 @@ if __name__ == '__main__':
                         help='Learning rate for SGD only')
     parser.add_argument('--momentum', type=float, default=0,
                         help='Momentum factor for SGD only')
-    parser.add_argument('--weight_decay', type=float, default=0.001,
+    parser.add_argument('--weight_decay', type=float, default=1e-6,
                         help='Weight decay factor')
     parser.add_argument('--split_ratio', type=float, default=0.8,
                         help='ratio of train/dev')
