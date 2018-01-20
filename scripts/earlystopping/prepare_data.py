@@ -10,7 +10,7 @@ from drqa.reader.utils import slugify, aggregate
 from drqa.tokenizers.tokenizer import Tokenizer
 from multiprocessing import Pool as ProcessPool
 
-import numpy as np
+# import numpy as np
 import pickle as pk
 import sys
 import time
@@ -54,7 +54,7 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
     all_n_p = []
     all_n_a = []
     # all_p_hidden = []
-    all_a_hidden = []
+    # all_a_hidden = []
     all_p_scores = []
     # all_a_scores = []
     for i, entry in enumerate(ranked_prediction):
@@ -78,20 +78,20 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
         for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
             n_a[Tokenizer.FEAT_DICT[feat]] += 1
 
-        p_h_path = os.path.join(DEFAULTS['features'], '%s_%s.npz' % (q_id, doc_id))
-        if os.path.exists(p_h_path):
-            p_h_data = np.load(p_h_path)
-            # p_h = p_h_data['doc_hidden']
-            a_h = p_h_data['ans_hidden']
-        else:
-            print('paragraph hidden file %s not exist!' % p_h_path)
-            sys.stdout.flush()
-            missing_count_ += 1
-            continue
+        # p_h_path = os.path.join(DEFAULTS['features'], '%s_%s.npz' % (q_id, doc_id))
+        # if os.path.exists(p_h_path):
+        #     p_h_data = np.load(p_h_path)
+        #     # p_h = p_h_data['doc_hidden']
+        #     a_h = p_h_data['ans_hidden']
+        # else:
+        #     print('paragraph hidden file %s not exist!' % p_h_path)
+        #     sys.stdout.flush()
+        #     missing_count_ += 1
+        #     continue
         all_n_p.append(n_p)
         all_n_a.append(n_a)
         # all_p_hidden.append(p_h)
-        all_a_hidden.append(a_h)
+        # all_a_hidden.append(a_h)
         all_p_scores.append(doc_score)
         # all_a_scores.append(ans_score)
 
@@ -100,7 +100,7 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
         f_sp = aggregate(all_p_scores)
         # f_sa = aggregate(all_a_scores)
         # f_hp = aggregate(all_p_hidden)
-        f_ha = aggregate(all_a_hidden)
+        # f_ha = aggregate(all_a_hidden)
 
         record = OrderedDict()
         # record['q'] = question
@@ -111,7 +111,7 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
         record['nq'] = list(map(float, n_q))
         record['np'] = f_np
         record['na'] = f_na
-        record['ha'] = f_ha
+        # record['ha'] = f_ha
         # record['sa'] = f_sa
         # record['hp'] = f_hp
         # record['hq'] = list(map(float, q_h))
@@ -142,9 +142,8 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, record_dir_
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--prediction_file',
-                        default='data/earlystopping/SQuAD-v1.1-dev-100-multitask-pipeline.preds')
-    parser.add_argument('-a', '--answer_file', default='data/datasets/SQuAD-v1.1-dev-100.txt')
+    parser.add_argument('-p', '--prediction_file', help='prediction file')
+    parser.add_argument('-a', '--answer_file', help='data set with labels (ends with .txt)')
     parser.add_argument('-m', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
     parser.add_argument('-ps', '--positive_scale', type=int, default=3, help='scale factor for positive samples')
     parser.add_argument('-ns', '--negative_scale', type=int, default=10, help='scale factor for negative samples')
