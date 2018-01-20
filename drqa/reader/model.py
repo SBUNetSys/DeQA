@@ -288,15 +288,11 @@ class DocReader(object):
         t2 = time.time()
         logger.debug('input processing [time]: %.4f s' % (t2 - t1))
         # Run forward
-        score_s, score_e, q_hiddens, doc_hiddens = self.network(*inputs)
+        score_s, score_e = self.network(*inputs)
 
         # Decode predictions
         score_s = score_s.data.cpu()
         score_e = score_e.data.cpu()
-        q_hiddens = q_hiddens.data.cpu()
-        doc_hiddens = doc_hiddens.data.cpu()
-        doc_mask = inputs[2]
-        doc_mask = doc_mask.data.cpu()
         if candidates:
             args = (score_s, score_e, candidates, top_n, self.args.max_len)
             if async_pool:
@@ -304,14 +300,14 @@ class DocReader(object):
             else:
                 return self.decode_candidates(*args)
         else:
-            args = (score_s, score_e, top_n, self.args.max_len, q_hiddens, doc_hiddens, doc_mask)
+            args = (score_s, score_e, top_n, self.args.max_len)
             if async_pool:
                 return async_pool.apply_async(self.decode, args)
             else:
                 return self.decode(*args)
 
     @staticmethod
-    def decode(score_s, score_e, top_n=1, max_len=None, q_h=None, doc_h=None, mask=None):
+    def decode(score_s, score_e, top_n=1, max_len=None):
         """Take argmax of constrained score_s * score_e.
 
         Args:
@@ -320,43 +316,35 @@ class DocReader(object):
             top_n: number of top scored pairs to take
             max_len: max span length to consider
         """
-
+        pred_s = []
+        pred_e = []
+        pred_score = []
         max_len = max_len or score_s.size(1)
         t1 = time.time()
-        # Outer product of scores to get full p_s * p_e matrix
-        scores = torch.ger(score_s[0], score_e[0])
+        for i in range(score_s.size(0)):
+            # Outer product of scores to get full p_s * p_e matrix
+            scores = torch.ger(score_s[i], score_e[i])
 
-        # Zero out negative length and over-length span scores
-        scores.triu_().tril_(max_len - 1)
+            # Zero out negative length and over-length span scores
+            scores.triu_().tril_(max_len - 1)
 
-        # Take argmax or top n
-        scores = scores.numpy()
-        scores_flat = scores.flatten()
-        if top_n == 1:
-            idx_sort = [np.argmax(scores_flat)]
-        elif len(scores_flat) < top_n:
-            idx_sort = np.argsort(-scores_flat)
-        else:
-            idx = np.argpartition(-scores_flat, top_n)[0:top_n]
-            idx_sort = idx[np.argsort(-scores_flat[idx])]
-        s_idx, e_idx = np.unravel_index(idx_sort, scores.shape)
-        pred_s = s_idx[0]
-        pred_e = e_idx[0]
-        pred_score = float(scores_flat[idx_sort][0])
-
-        q_hidden = q_h.numpy()
-        doc_hidden = np.squeeze(doc_h.numpy())
-        d_mask = np.squeeze(mask.numpy())
-        d_merge_weights = layers.np_uniform_weights(doc_hidden, d_mask)
-        p_hidden = layers.np_weighted_avg(doc_hidden, d_merge_weights)
-        ans_hidden = doc_hidden[s_idx[0]:e_idx[0] + 1]
-        a_mask = d_mask[s_idx[0]:e_idx[0] + 1]
-        a_merge_weights = layers.np_uniform_weights(ans_hidden, a_mask)
-        a_hidden = layers.np_weighted_avg(ans_hidden, a_merge_weights)
-
+            # Take argmax or top n
+            scores = scores.numpy()
+            scores_flat = scores.flatten()
+            if top_n == 1:
+                idx_sort = [np.argmax(scores_flat)]
+            elif len(scores_flat) < top_n:
+                idx_sort = np.argsort(-scores_flat)
+            else:
+                idx = np.argpartition(-scores_flat, top_n)[0:top_n]
+                idx_sort = idx[np.argsort(-scores_flat[idx])]
+            s_idx, e_idx = np.unravel_index(idx_sort, scores.shape)
+            pred_s.append(s_idx)
+            pred_e.append(e_idx)
+            pred_score.append(scores_flat[idx_sort])
         t2 = time.time()
         logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
-        return pred_s, pred_e, pred_score, np.squeeze(q_hidden), np.squeeze(p_hidden), np.squeeze(a_hidden)
+        return pred_s, pred_e, pred_score
 
     @staticmethod
     def decode_candidates(score_s, score_e, candidates, top_n=1, max_len=None):

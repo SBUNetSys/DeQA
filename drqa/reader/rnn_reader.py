@@ -154,4 +154,4 @@ class RnnDocReader(nn.Module):
         t11 = time.time()
         logger.debug('end_attn [time]: %.4f s' % (t11 - t10))
 
-        return start_scores, end_scores, question_hidden, doc_hiddens
+        return start_scores, end_scores
