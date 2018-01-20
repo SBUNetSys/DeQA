@@ -269,7 +269,7 @@ class DrQA(object):
             start, end = didx2sidx[did2didx[did]]
             for sidx in range(start, end):
                 para_text = s_tokens[sidx].words()
-                if len(q_text) > 0 and len(para_text) > 0:
+                if len(q_text) > 0 and len(para_text) > 10:
                     examples.append({
                         'id': (rel_didx, sidx),
                         'question': q_text,
@@ -299,49 +299,41 @@ class DrQA(object):
         all_n_a = []
         all_p_scores = []
         for batch in self._get_loader(examples, num_loaders):
-            ids = batch[-1][0]
-            rel_didx, sidx = ids
-            doc_id = all_docids[0][rel_didx]
-            doc_score = float(all_doc_scores[0][rel_didx])
-            if batch[0].size(1) <= 10:
-                logger.info('too short paragraph, skip, doc_id: %s' % doc_id)
-                continue
             handle = self.reader.predict(batch, async_pool=self.processes)
-            start, end, a_score = handle.get()
-            prediction = {
-                'doc_id': doc_id,
-                'start': int(start),
-                'end': int(end),
-                'span': s_tokens[sidx].slice(start, end + 1).untokenize(),
-                'doc_score': doc_score,
-                'span_score': a_score,
-            }
-            if return_context:
-                prediction['context'] = {
-                    'text': s_tokens[sidx].untokenize(),
-                    'start': s_tokens[sidx].offsets()[start][0],
-                    'end': s_tokens[sidx].offsets()[end][1],
-                }
-            predictions.append(prediction)
-            n_p = [0 for _ in Tokenizer.FEAT]
-            n_a = [0 for _ in Tokenizer.FEAT]
-            for feat in p_ner[doc_id] + p_pos[doc_id]:
-                n_p[Tokenizer.FEAT_DICT[feat]] += 1
-            for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
-                n_a[Tokenizer.FEAT_DICT[feat]] += 1
-            all_n_p.append(n_p)
-            all_n_a.append(n_a)
-            all_p_scores.append(doc_score)
-            f_sp = aggregate(all_p_scores)
-            f_np = aggregate(all_n_p)
-            f_na = aggregate(all_n_a)
-            et_input = torch.FloatTensor(f_sp + f_nq + f_np + f_na)
-            et_output = self.et_model.predict(et_input, prob=True)
-            et_prob = float(et_output.cpu().numpy())
-            if et_prob <= 0.5:
-                continue
-            else:
+            starts, ends, ans_scores = handle.get()
+            starts = [s[0] for s in starts]
+            ends = [e[0] for e in ends]
+            ans_scores = [float(a[0]) for a in ans_scores]
+
+            doc_ids = [all_docids[0][ids_[0]] for ids_ in batch[-1]]
+            doc_scores = [float(all_doc_scores[0][ids_[0]]) for ids_ in batch[-1]]
+            sids = [ids_[1] for ids_ in batch[-1]]
+            all_np = []
+            all_na = []
+            for doc_id, start, end in zip(doc_ids, starts, ends):
+                n_p = [0 for _ in Tokenizer.FEAT]
+                for feat in p_ner[doc_id] + p_pos[doc_id]:
+                    n_p[Tokenizer.FEAT_DICT[feat]] += 1
+                n_a = [0 for _ in Tokenizer.FEAT]
+                for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
+                    n_a[Tokenizer.FEAT_DICT[feat]] += 1
+                all_np.append(n_p)
+                all_na.append(n_a)
+
+            all_n_p.extend(all_np)
+            all_n_a.extend(all_na)
+            all_p_scores.extend(doc_scores)
+
+            f_d = (doc_ids, sids)
+            f_n = (all_p_scores, all_n_p, all_n_a)
+            r_s = (starts, ends, ans_scores)
+            stop, batch_predictions = self.batch_predict_stop(f_d, f_n, r_s, s_tokens, f_nq)
+
+            predictions.extend(batch_predictions)
+            if stop:
                 break
+            else:
+                continue
         t8 = time.time()
         logger.info('paragraphs predicted [time]: %.4f s' % (t8 - t7))
         all_predictions.append(predictions[-1::-1])
@@ -349,3 +341,36 @@ class DrQA(object):
                     (len(queries), time.time() - t3))
 
         return all_predictions
+
+    def batch_predict_stop(self, f_d, f_n, r_s, s_tokens, f_nq):
+        doc_ids, sids = f_d
+        batch_size = len(doc_ids)
+        all_s_p, all_np, all_na = f_n
+        doc_scores, f_np, f_na = all_s_p[-batch_size:], all_np[-batch_size:], all_na[-batch_size:]
+        starts, ends, ans_scores = r_s
+        predictions_ = []
+        should_stop = False
+        for i, item in enumerate(zip(doc_ids, sids, doc_scores, starts, ends, ans_scores)):
+            doc_id, sid, doc_score, start, end, a_score = item
+            prediction = {
+                'doc_id': doc_id,
+                'start': int(start),
+                'end': int(end),
+                'span': s_tokens[sid].slice(start, end + 1).untokenize(),
+                'doc_score': doc_score,
+                'span_score': a_score,
+            }
+            predictions_.append(prediction)
+            loc = - batch_size + i + 1 if - batch_size + i + 1 else None
+            sp = all_s_p[: loc]
+            np = all_np[: loc]
+            na = all_na[: loc]
+            f_sp = aggregate(sp)
+            f_np = aggregate(np)
+            f_na = aggregate(na)
+            et_input = torch.FloatTensor(f_sp + f_nq + f_np + f_na)
+            et_prob = self.et_model.predict(et_input, prob=True)
+            if et_prob > 0.5:
+                should_stop = True
+                break
+        return should_stop, predictions_

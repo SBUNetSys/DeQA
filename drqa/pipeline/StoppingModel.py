@@ -86,7 +86,10 @@ class EarlyStoppingModel(object):
         _, predicted_score = torch.max(score, dim)
         if prob:
             # return stop probability
-            return torch.exp(score[:, 1])
+            if dim:
+                return torch.exp(score[:, 1])
+            else:
+                return torch.exp(score)[1]
         else:
             return predicted_score
 
