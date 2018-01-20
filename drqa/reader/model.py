@@ -288,7 +288,7 @@ class DocReader(object):
         t2 = time.time()
         logger.debug('input processing [time]: %.4f s' % (t2 - t1))
         # Run forward
-        score_s, score_e, q_hiddens, doc_hiddens = self.network(*inputs)
+        score_s, score_e = self.network(*inputs)
 
         # Decode predictions
         score_s = score_s.data.cpu()
