@@ -56,8 +56,10 @@ parser.add_argument('--parallel', action='store_true',
                     help='Use data parallel (split across gpus)')
 parser.add_argument('--num-workers', type=int, default=None,
                     help='Number of CPU processes (for tokenizing, etc)')
-parser.add_argument('--batch-size', type=int, default=128,
+parser.add_argument('--batch-size', type=int, default=16,
                     help='Document paragraph batching size')
+parser.add_argument('--et-threshold', type=float, default=0.5,
+                    help='early stopping threshold')
 parser.add_argument('--predict-batch-size', type=int, default=1,
                     help='Question batching size')
 parser.add_argument('--no_galago', action='store_false')
@@ -110,6 +112,7 @@ DrQA = pipeline.DrQA(
     data_parallel=args.parallel,
     ranker_config=ranker_config_dict,
     num_workers=args.num_workers,
+    et_threshold=args.et_threshold
 )
 
 # ------------------------------------------------------------------------------
@@ -126,7 +129,7 @@ for line in open(args.dataset):
 model = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
 basename = os.path.splitext(os.path.basename(args.dataset))[0]
 out_dir = os.path.dirname(args.dataset)
-outfile = os.path.join(out_dir, basename + '-' + args.out_suffix)
+outfile = os.path.join(out_dir, basename + args.out_suffix)
 
 logger.info('Writing results to %s' % outfile)
 with open(outfile, 'w') as f:

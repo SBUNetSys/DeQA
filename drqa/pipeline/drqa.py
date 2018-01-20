@@ -69,7 +69,8 @@ class DrQA(object):
             data_parallel=False,
             max_loaders=5,
             num_workers=None,
-            ranker_config=None
+            ranker_config=None,
+            et_threshold=0.5
     ):
         """Initialize the pipeline.
 
@@ -90,6 +91,8 @@ class DrQA(object):
             ranker_config: config for ranker.
         """
         self.batch_size = batch_size
+        self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.5
+
         self.max_loaders = max_loaders
         self.fixed_candidates = fixed_candidates is not None
         self.cuda = cuda
@@ -115,7 +118,7 @@ class DrQA(object):
         logger.info('Initializing early stopping model...')
         et_model = DEFAULTS['linear_model']
         self.et_model = EarlyStoppingModel.load(et_model)
-
+        logger.info('early stopping model (et threshold: %s) loaded.' % self.et_threshold)
         if embedding_file:
             logger.info('embedding_file')
             logger.info('Expanding dictionary...')
@@ -370,7 +373,7 @@ class DrQA(object):
             f_na = aggregate(na)
             et_input = torch.FloatTensor(f_sp + f_nq + f_np + f_na)
             et_prob = self.et_model.predict(et_input, prob=True)
-            if et_prob > 0.5:
+            if et_prob > self.et_threshold:
                 should_stop = True
                 break
         return should_stop, predictions_
