@@ -23,12 +23,12 @@ def get_rank(prediction_, answer_, use_regex_=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--answer_file', type=str, default='data/datasets/SQuAD-v1.1-dev.txt')
-    parser.add_argument('-p', '--prediction_file',
-                        default='data/earlystopping/SQuAD-v1.1-dev-multitask-pipeline.preds')
+    parser.add_argument('-p', '--prediction_file', default='data/earlystopping/SQuAD-v1.1-dev-multitask-pipeline.preds')
     parser.add_argument('-ans', '--answer_rank', action='store_true', help='default to use doc score rank')
     parser.add_argument('-r', '--regex', action='store_true', help='default to use exact match')
     parser.add_argument('-d', '--draw', action='store_true', help='default not output draw data')
-    parser.add_argument('-t', '--top_n', type=int, default=150, help='manual stop location')
+    parser.add_argument('-s', '--stop_location', type=int, default=150, help='manual stop location')
+    parser.add_argument('-t', '--top_n', type=int, default=150, help='print top n accuracy')
 
     args = parser.parse_args()
     answer_file = args.answer_file
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         answer = [normalize(a) for a in data['answer']]
         prediction = json.loads(prediction_line)
         prediction = sorted(prediction, key=lambda k: -k['doc_score'])
-        top_prediction = prediction[:args.top_n]
+        top_prediction = prediction[:args.stop_location]
         if args.answer_rank:
             prediction = sorted(top_prediction, key=lambda k: -k['span_score'])
         doc_rank = get_rank(prediction, answer, args.regex)
@@ -54,13 +54,24 @@ if __name__ == '__main__':
         keys = range(1, 151, 1)
     else:
         keys = sorted(rank_counter.keys())
+
+    top_n = args.top_n
     for rank in keys:
         num = rank_counter.get(rank, 0)
         rate = num / len(ranks) * 100
         acc_rank += num
         acc_rate = acc_rank / len(ranks) * 100
-        if args.draw:
-            print('%.1f%%' % acc_rate)
-        else:
-            print('%s, %s, %.1f%%, %.1f%%' % (rank, rank_counter.get(rank), rate, acc_rate))
 
+        if rank <= top_n:
+            if args.draw:
+                print('%.1f%%' % acc_rate)
+            else:
+                print('%s, %s, %.1f%%, %.1f%%' % (rank, rank_counter.get(rank), rate, acc_rate))
+        else:
+            left_rank = len(ranks) - acc_rank + num  # already deducted num right at the top_n, need to add it back
+            left_rate = left_rank / len(ranks) * 100
+            if args.draw:
+                print()
+            else:
+                print('>%d, %s, %.1f%%, %.1f%%' % (top_n, left_rank, left_rate, 100.0))
+            break
