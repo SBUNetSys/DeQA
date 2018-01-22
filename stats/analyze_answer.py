@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-ans', '--answer_rank', action='store_true', help='default to use doc score rank')
     parser.add_argument('-r', '--regex', action='store_true', help='default to use exact match')
     parser.add_argument('-d', '--draw', action='store_true', help='default not output draw data')
+    parser.add_argument('-t', '--top_n', type=int, default=150, help='manual stop location')
 
     args = parser.parse_args()
     answer_file = args.answer_file
@@ -40,10 +41,10 @@ if __name__ == '__main__':
         question = data['question']
         answer = [normalize(a) for a in data['answer']]
         prediction = json.loads(prediction_line)
+        prediction = sorted(prediction, key=lambda k: -k['doc_score'])
+        top_prediction = prediction[:args.top_n]
         if args.answer_rank:
-            prediction = sorted(prediction, key=lambda k: -k['span_score'])
-        else:
-            prediction = sorted(prediction, key=lambda k: -k['doc_score'])
+            prediction = sorted(top_prediction, key=lambda k: -k['span_score'])
         doc_rank = get_rank(prediction, answer, args.regex)
         ranks.append(doc_rank)
 
