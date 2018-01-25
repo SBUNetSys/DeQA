@@ -28,7 +28,7 @@ def load_data(args, filename, skip_no_answer=False):
     One example per line, JSON encoded.
     """
     # Load JSON lines
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         examples = [json.loads(line) for line in f]
 
     # Make case insensitive?
@@ -49,7 +49,7 @@ def load_data(args, filename, skip_no_answer=False):
 def load_text(filename):
     """Load the paragraphs only of a SQuAD dataset. Store as qid -> text."""
     # Load JSON file
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         examples = json.load(f)['data']
 
     texts = {}
@@ -63,7 +63,7 @@ def load_text(filename):
 def load_answers(filename):
     """Load the answers only of a SQuAD dataset. Store as qid -> [answers]."""
     # Load JSON file
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         examples = json.load(f)['data']
 
     ans = {}
@@ -82,7 +82,7 @@ def load_answers(filename):
 def index_embedding_words(embedding_file):
     """Put all the words in embedding_file into a set."""
     words = set()
-    with open(embedding_file) as f:
+    with open(embedding_file, encoding="utf-8") as f:
         for line in f:
             w = Dictionary.normalize(line.rstrip().split(' ')[0])
             words.add(w)

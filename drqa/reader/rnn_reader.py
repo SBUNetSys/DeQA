@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class RnnDocReader(nn.Module):
-    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN}
+    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN, 'sru': 'SRU'}
 
     def __init__(self, args, normalize=True):
         super(RnnDocReader, self).__init__()

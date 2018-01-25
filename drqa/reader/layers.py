@@ -12,7 +12,9 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import logging
 import time
+
 logger = logging.getLogger(__name__)
+
 
 # ------------------------------------------------------------------------------
 # Modules
@@ -37,11 +39,29 @@ class StackedBRNN(nn.Module):
         self.num_layers = num_layers
         self.concat_layers = concat_layers
         self.rnns = nn.ModuleList()
+
+        if rnn_type == 'SRU':
+            try:
+                from sru import SRUCell
+                rnn_ = SRUCell(input_size, hidden_size,
+                               dropout=dropout_rate,
+                               rnn_dropout=dropout_rate,
+                               use_tanh=1,
+                               bidirectional=True)
+            except ImportError:
+                logger.info('no sru installed, use LSTM as default')
+                rnn_type = nn.LSTM
+                rnn_ = rnn_type(input_size, hidden_size,
+                                num_layers=1,
+                                bidirectional=True)
+        else:
+            rnn_ = rnn_type(input_size, hidden_size,
+                            num_layers=1,
+                            bidirectional=True)
+
         for i in range(num_layers):
             input_size = input_size if i == 0 else 2 * hidden_size
-            self.rnns.append(rnn_type(input_size, hidden_size,
-                                      num_layers=1,
-                                      bidirectional=True))
+            self.rnns.append(rnn_)
 
     def forward(self, x, x_mask):
         """Encode either padded or non-padded sequences.
@@ -306,7 +326,6 @@ def uniform_weights(x, x_mask):
 
 
 def np_uniform_weights(x, x_mask):
-
     import numpy as np
     alpha = np.equal(x_mask, 0) * 1.0
     alpha = alpha / alpha.sum()
