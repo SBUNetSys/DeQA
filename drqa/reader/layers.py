@@ -42,25 +42,18 @@ class StackedBRNN(nn.Module):
 
         if rnn_type == 'SRU':
             try:
-                from sru import SRUCell
-                rnn_ = SRUCell(input_size, hidden_size,
-                               dropout=dropout_rate,
-                               rnn_dropout=dropout_rate,
-                               use_tanh=1,
-                               bidirectional=True)
+                import sru
+                rnn_type = sru.SRUCell
             except ImportError:
                 logger.info('no sru installed, use LSTM as default')
                 rnn_type = nn.LSTM
-                rnn_ = rnn_type(input_size, hidden_size,
-                                num_layers=1,
-                                bidirectional=True)
         else:
-            rnn_ = rnn_type(input_size, hidden_size,
-                            num_layers=1,
-                            bidirectional=True)
+            rnn_type = nn.LSTM
 
         for i in range(num_layers):
             input_size = input_size if i == 0 else 2 * hidden_size
+            rnn_ = rnn_type(input_size, hidden_size, dropout=dropout_rate,
+                            num_layers=1, bidirectional=True)
             self.rnns.append(rnn_)
 
     def forward(self, x, x_mask):
