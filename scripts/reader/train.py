@@ -15,13 +15,11 @@ import sys
 import subprocess
 import logging
 
-
 from drqa.reader import utils, vector, config, data
 from drqa.reader import DocReader
 from drqa import DATA_DIR as DRQA_DATA
 
 logger = logging.getLogger()
-
 
 # ------------------------------------------------------------------------------
 # Training arguments.
@@ -32,6 +30,7 @@ logger = logging.getLogger()
 DATA_DIR = os.path.join(DRQA_DATA, 'datasets')
 MODEL_DIR = '/tmp/drqa-models/'
 EMBED_DIR = os.path.join(DRQA_DATA, 'embeddings')
+
 
 def str2bool(v):
     return v.lower() in ('yes', 'true', 't', '1', 'y')

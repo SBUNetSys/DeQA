@@ -68,16 +68,16 @@ class StackedBRNN(nn.Module):
         Output:
             x_encoded: batch * len * hdim_encoded
         """
-        if x_mask.data.sum() == 0:
-            # No padding necessary.
-            output = self._forward_unpadded(x, x_mask)
-        elif self.padding or not self.training:
-            # Pad if we care or if its during eval.
-            output = self._forward_padded(x, x_mask)
-        else:
-            # We don't care.
-            output = self._forward_unpadded(x, x_mask)
-
+        # if x_mask.data.sum() == 0:
+        #     # No padding necessary.
+        #     output = self._forward_unpadded(x, x_mask)
+        # elif self.padding or not self.training:
+        #     # Pad if we care or if its during eval.
+        #     output = self._forward_padded(x, x_mask)
+        # else:
+        #     # We don't care.
+        #     output = self._forward_unpadded(x, x_mask)
+        output = self._forward_unpadded(x, x_mask)
         return output.contiguous()
 
     def _forward_unpadded(self, x, x_mask):
