@@ -163,10 +163,10 @@ def search_docs(inputs, max_ex=5, opts=None):
     if not opts:
         raise RuntimeError('Options dict must be supplied.')
 
-    doc_ids, q_tokens, answer = inputs
+    doc_texts, q_tokens, answer = inputs
     examples = []
-    for i, doc_id in enumerate(doc_ids):
-        for j, paragraph in enumerate(re.split(r'\n+', fetch_text(doc_id))):
+    for i, doc_text in enumerate(doc_texts):
+        for j, paragraph in enumerate(re.split(r'\n+', doc_text)):
             found = find_answer(paragraph, q_tokens, answer, opts)
             if found:
                 # Reverse ranking, giving priority to early docs + paragraphs
@@ -184,18 +184,18 @@ def process(questions, answers, outfile, opts):
     logger.info('Will save to %s.dstrain and %s.dsdev' % (outfile, outfile))
 
     # Load ranker
-    ranker = opts['ranker_class'](strict=False)
+    ranker = opts['ranker_class']()
     logger.info('Ranking documents (top %d per question)...' % opts['n_docs'])
     ranked = ranker.batch_closest_docs(questions, k=opts['n_docs'])
-    ranked = [r[0] for r in ranked]
-
+    ranked = [r[2] for r in ranked]
+    # print(ranked)
     # Start pool of tokenizers with ner enabled
     workers = Pool(opts['workers'], initializer=init,
                    initargs=(opts['tokenizer_class'], {'annotators': {'ner'}}))
 
     logger.info('Pre-tokenizing questions...')
-    q_tokens = workers.map(tokenize_text, questions)
-    q_ner = workers.map(nltk_entity_groups, questions)
+    q_tokens = workers.map_async(tokenize_text, questions).get()
+    q_ner = workers.map_async(nltk_entity_groups, questions).get()
     q_tokens = list(zip(q_tokens, q_ner))
     workers.close()
     workers.join()
@@ -254,10 +254,10 @@ if __name__ == "__main__":
     general = parser.add_argument_group('General')
     general.add_argument('--max-ex', type=int, default=5,
                          help='Maximum matches generated per question')
-    general.add_argument('--n-docs', type=int, default=5,
+    general.add_argument('--n-docs', type=int, default=150,
                          help='Number of docs retrieved per question')
-    general.add_argument('--tokenizer', type=str, default='corenlp')
-    general.add_argument('--ranker', type=str, default='tfidf')
+    general.add_argument('--tokenizer', type=str, default='spacy')
+    general.add_argument('--ranker', type=str, default='galago')
     general.add_argument('--db', type=str, default='sqlite')
     general.add_argument('--workers', type=int, default=cpu_count())
     args = parser.parse_args()
@@ -292,7 +292,7 @@ if __name__ == "__main__":
 
     # Get classes
     ranker_class = retriever.get_class(args.ranker)
-    db_class = retriever.get_class(args.db)
+    # db_class = retriever.get_class(args.db)
     tokenizer_class = tokenizers.get_class(args.tokenizer)
 
     # Form options
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     opts = {
         'ranker_class': retriever.get_class(args.ranker),
         'tokenizer_class': tokenizers.get_class(args.tokenizer),
-        'db_class': retriever.get_class(args.db),
+        'db_class': None,
         'search': {k: vars(args)[k] for k in search_keys},
     }
     opts.update(vars(args))
