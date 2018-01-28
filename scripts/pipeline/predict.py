@@ -137,9 +137,9 @@ with open(outfile, 'w') as f:
     batches = [queries[i: i + args.predict_batch_size]
                for i in range(0, len(queries), args.predict_batch_size)]
     for i, batch in enumerate(batches):
-        logger.info(
-            '-' * 25 + ' Batch %d/%d ' % (i + 1, len(batches)) + '-' * 25
-        )
+        batch_info = '-' * 5 + ' Batch %d/%d ' % (i + 1, len(batches)) + '-' * 5 + ' '
+        start_query = queries[i]
+        logger.info(batch_info + start_query)
         predictions = DrQA.process_batch(
             batch,
             n_docs=args.n_docs,
