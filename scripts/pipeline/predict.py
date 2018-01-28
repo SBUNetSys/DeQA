@@ -12,7 +12,7 @@ import time
 import json
 import argparse
 import logging
-
+import sys
 from drqa import pipeline
 from drqa.retriever import utils
 from drqa.retriever import GalagoRanker
@@ -69,6 +69,10 @@ if args.verbose:
     logger.setLevel(logging.DEBUG)
 
 t0 = time.time()
+logfile = logging.FileHandler('/tmp/%s.log' % t0, 'w')
+logfile.setFormatter(fmt)
+logger.addHandler(logfile)
+logger.info('COMMAND: \n%s' % ' '.join(sys.argv))
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 if args.cuda:
