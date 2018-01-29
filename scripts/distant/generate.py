@@ -194,8 +194,8 @@ def process(questions, answers, outfile, opts):
                    initargs=(opts['tokenizer_class'], {'annotators': {'ner'}}))
 
     logger.info('Pre-tokenizing questions...')
-    q_tokens = workers.map_async(tokenize_text, questions).get()
-    q_ner = workers.map_async(nltk_entity_groups, questions).get()
+    q_tokens = workers.map(tokenize_text, questions)
+    q_ner = workers.map(nltk_entity_groups, questions)
     q_tokens = list(zip(q_tokens, q_ner))
     workers.close()
     workers.join()
@@ -209,8 +209,8 @@ def process(questions, answers, outfile, opts):
     cnt = 0
     inputs = [(ranked[i], q_tokens[i], answers[i]) for i in range(len(ranked))]
     search_fn = partial(search_docs, max_ex=opts['max_ex'], opts=opts['search'])
-    with open(outfile + '.dstrain', 'w') as f_train, \
-         open(outfile + '.dsdev', 'w') as f_dev:
+    with open(outfile + '.dstrain.txt', 'w') as f_train, \
+         open(outfile + '.dsdev.txt', 'w') as f_dev:
         for res in workers.imap_unordered(search_fn, inputs):
             for ex in res:
                 cnt += 1
@@ -254,9 +254,9 @@ if __name__ == "__main__":
     general = parser.add_argument_group('General')
     general.add_argument('--max-ex', type=int, default=5,
                          help='Maximum matches generated per question')
-    general.add_argument('--n-docs', type=int, default=150,
+    general.add_argument('--n-docs', type=int, default=50,
                          help='Number of docs retrieved per question')
-    general.add_argument('--tokenizer', type=str, default='spacy')
+    general.add_argument('--tokenizer', type=str, default='corenlp')
     general.add_argument('--ranker', type=str, default='galago')
     general.add_argument('--db', type=str, default='sqlite')
     general.add_argument('--workers', type=int, default=cpu_count())
