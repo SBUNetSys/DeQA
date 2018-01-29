@@ -18,6 +18,7 @@ class GalagoRanker(object):
     """
 
     def __init__(self, galago_path=None, index_path=None, use_keyword=True):
+        self.question = None
         self.galago_path = galago_path or DEFAULTS['galago_path']
         self.index_path = index_path or DEFAULTS['galago_index']
         self.use_keyword = use_keyword
@@ -32,6 +33,7 @@ class GalagoRanker(object):
         """Closest docs by dot product between query and documents
         in tfidf weighted word vector space.
         """
+        self.question = question
         if self.use_keyword:
             keyword_items = Rake().run(question)
             word_queries = []
@@ -44,11 +46,14 @@ class GalagoRanker(object):
             word_queries = self.parse(utils.normalize(question))
 
         query = ' '.join(word_queries)
-        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % query]
-        search_results = self._run_galago('batch-search', args)
         doc_scores = []
         doc_ids = []
         doc_texts = []
+        if query.strip() is None:
+            logger.warning('question: %s has no query!' % question)
+            return doc_ids, doc_scores, doc_texts
+        args = ['--requested=%s' % k, '--casefold=true', '--query=', '#combine(%s)' % query]
+        search_results = self._run_galago('batch-search', args)
         for result in search_results.split('</TEXT>'):
 
             # skip <NE> field
@@ -94,6 +99,6 @@ class GalagoRanker(object):
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         if err:
-            logger.warning('galago args:[%s] error: ' % args)
+            logger.warning('galago question:%s args:[%s] error: ' % (self.question, args))
             logger.warning(err)
         return out.decode("utf-8").strip()
