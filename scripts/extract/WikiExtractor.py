@@ -619,14 +619,18 @@ class Extractor(object):
             # out.write(footer)
             seq = 1
             for line in text:
-                if not line:
+                if not line or len(line.split()) < 50:
                     continue
                 # logging.info('%.4f s elapsed %d articles, %d paras, current article: %s',
                 #              elapsed_time, article_count, para_count, self.title)
                 sys.stdout.flush()
-                header = '<DOC>\n<DOCNO>%s_%d</DOCNO>\n<TEXT>' % (self.id, seq)
-                footer = "\n</TEXT>\n</DOC>\n"
+                header = '<DOC>\n<DOCNO>%s_%d</DOCNO>\n' % (self.id, seq)
+                title = '<TITLE>%s</TITLE>\n' % self.title
+                text_header = '<TEXT>\n'
+                footer = '\n</TEXT>\n</DOC>\n'
                 out.write(header)
+                out.write(title)
+                out.write(text_header)
                 out.write(line)
                 out.write(footer)
                 seq += 1
