@@ -254,10 +254,10 @@ if __name__ == "__main__":
     general = parser.add_argument_group('General')
     general.add_argument('--max-ex', type=int, default=5,
                          help='Maximum matches generated per question')
-    general.add_argument('--n-docs', type=int, default=50,
+    general.add_argument('--n-docs', type=int, default=150,
                          help='Number of docs retrieved per question')
     general.add_argument('--tokenizer', type=str, default='corenlp')
-    general.add_argument('--ranker', type=str, default='galago')
+    general.add_argument('--ranker', type=str, default='lucene')
     general.add_argument('--db', type=str, default='sqlite')
     general.add_argument('--workers', type=int, default=cpu_count())
     args = parser.parse_args()

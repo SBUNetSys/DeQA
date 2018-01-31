@@ -134,6 +134,8 @@ if __name__ == '__main__':
         ranker = retriever.get_class('galago')(use_keyword=args.use_keyword, index_path=args.db_path)
     elif args.ranker.lower().startswith('s'):
         ranker = retriever.get_class('sql')(db_path=args.db_path)
+    elif args.ranker.lower().startswith('l'):
+        ranker = retriever.get_class('lucene')(index_path=args.db_path)
     else:
         ranker = retriever.get_class('tfidf')(tfidf_path=args.model, db_path=args.db_path)
 

@@ -60,7 +60,7 @@ parser.add_argument('--batch-size', type=int, default=128,
                     help='Document paragraph batching size')
 parser.add_argument('--predict-batch-size', type=int, default=1,
                     help='Question batching size')
-parser.add_argument('--no_galago', action='store_false')
+parser.add_argument('--no_galago', action='store_true')
 parser.add_argument("-v", "--verbose", help="log more debug info",
                     action="store_true")
 
@@ -94,14 +94,14 @@ else:
     candidates = None
 
 if args.no_galago:
+    ranker_config_dict = {'options': {'tfidf_path': args.retriever_model,
+                                      'strict': False}}
+else:
     ranker_config_dict = {
         'class': GalagoRanker,
         'options': {'use_keyword': True,
                     'index_path': args.db_path
                     }}
-else:
-    ranker_config_dict = {'options': {'tfidf_path': args.retriever_model,
-                                      'strict': False}}
 
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
