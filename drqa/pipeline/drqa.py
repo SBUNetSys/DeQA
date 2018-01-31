@@ -69,7 +69,7 @@ class DrQA(object):
             data_parallel=False,
             max_loaders=5,
             num_workers=None,
-            ranker_config=None
+            ranker=None
     ):
         """Initialize the pipeline.
 
@@ -99,10 +99,7 @@ class DrQA(object):
             os.makedirs(feat_dir)
 
         logger.info('Initializing document ranker...')
-        ranker_config = ranker_config or {}
-        ranker_class = ranker_config.get('class', DEFAULTS['ranker'])
-        ranker_opts = ranker_config.get('options', {})
-        self.ranker = ranker_class(**ranker_opts)
+        self.ranker = ranker
 
         logger.info('Initializing document reader...')
         t0 = time.time()

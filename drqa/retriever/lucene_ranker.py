@@ -14,7 +14,7 @@ TEXT_FLAG = '|TEXT:===>|'
 DATA_DIR = (os.path.join(PosixPath(__file__).absolute().parents[2].as_posix(), 'data'))
 DEFAULTS = {
     'lucene_path': os.path.join(DATA_DIR, 'LuceneTrecEnWiki-0.2/bin/LuceneTrecEnWiki'),
-    'lucene_index': os.path.join(DATA_DIR, 'wikipedia/enwiki-lucene-20171103/')
+    'lucene_index': os.path.join(DATA_DIR, 'wikipedia/enwiki-lucene-20180120/')
 }
 
 

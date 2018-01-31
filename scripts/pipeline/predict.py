@@ -13,7 +13,7 @@ import json
 import argparse
 import logging
 import sys
-from drqa import pipeline
+from drqa import pipeline, retriever
 from drqa.retriever import utils
 from drqa.retriever import GalagoRanker
 
@@ -60,7 +60,8 @@ parser.add_argument('--batch-size', type=int, default=128,
                     help='Document paragraph batching size')
 parser.add_argument('--predict-batch-size', type=int, default=1,
                     help='Question batching size')
-parser.add_argument('--no_galago', action='store_true')
+parser.add_argument('--ranker', type=str, default='lucene',)
+parser.add_argument('--use_keyword', action='store_true')
 parser.add_argument("-v", "--verbose", help="log more debug info",
                     action="store_true")
 
@@ -93,15 +94,14 @@ if args.candidate_file:
 else:
     candidates = None
 
-if args.no_galago:
-    ranker_config_dict = {'options': {'tfidf_path': args.retriever_model,
-                                      'strict': False}}
+if args.ranker.lower().startswith('g'):
+    ranker = retriever.get_class('galago')(use_keyword=args.use_keyword, index_path=args.db_path)
+elif args.ranker.lower().startswith('s'):
+    ranker = retriever.get_class('sql')(db_path=args.db_path)
+elif args.ranker.lower().startswith('l'):
+    ranker = retriever.get_class('lucene')(index_path=args.db_path)
 else:
-    ranker_config_dict = {
-        'class': GalagoRanker,
-        'options': {'use_keyword': True,
-                    'index_path': args.db_path
-                    }}
+    ranker = retriever.get_class('tfidf')(tfidf_path=args.retriever_model, db_path=args.db_path)
 
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
@@ -112,7 +112,7 @@ DrQA = pipeline.DrQA(
     batch_size=args.batch_size,
     cuda=args.cuda,
     data_parallel=args.parallel,
-    ranker_config=ranker_config_dict,
+    ranker=ranker,
     num_workers=args.num_workers,
 )
 
