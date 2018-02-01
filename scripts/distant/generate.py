@@ -34,7 +34,6 @@ from drqa.retriever import utils
 
 logger = logging.getLogger()
 
-
 # ------------------------------------------------------------------------------
 # Fetch text, tokenize + annotate
 # ------------------------------------------------------------------------------
@@ -178,49 +177,64 @@ def search_docs(inputs, max_ex=5, opts=None):
     return [e[1] for e in examples]
 
 
-def process(questions, answers, outfile, opts):
+def gen_pairs(q, a, batch_size=100):
+    size = len(q)
+    batch_size = min(batch_size, size)
+    for start in range(0, size, batch_size):
+        end = start + batch_size
+        yield q[start: end], a[start:end]
+
+
+def process(questions_, answers_, outfile_, opts_):
     """Generate examples for all questions."""
-    logger.info('Processing %d question answer pairs...' % len(questions))
-    logger.info('Will save to %s.dstrain and %s.dsdev' % (outfile, outfile))
-
+    logger.info('Processing %d question answer pairs...' % len(questions_))
+    logger.info('Will save to %s.dstrain.txt and %s.dsdev.txt' % (outfile_, outfile_))
     # Load ranker
-    ranker = opts['ranker_class']()
-    logger.info('Ranking documents (top %d per question)...' % opts['n_docs'])
-    ranked = ranker.batch_closest_docs(questions, k=opts['n_docs'])
-    ranked = [r[2] for r in ranked]
-    # print(ranked)
-    # Start pool of tokenizers with ner enabled
-    workers = Pool(opts['workers'], initializer=init,
-                   initargs=(opts['tokenizer_class'], {'annotators': {'ner'}}))
+    ranker = opts_['ranker_class']()
+    logger.info('Ranking documents (top %d per question)...' % opts_['n_docs'])
 
-    logger.info('Pre-tokenizing questions...')
-    q_tokens = workers.map(tokenize_text, questions)
-    q_ner = workers.map(nltk_entity_groups, questions)
-    q_tokens = list(zip(q_tokens, q_ner))
-    workers.close()
-    workers.join()
-
-    # Start pool of simple tokenizers + db connections
-    workers = Pool(opts['workers'], initializer=init,
-                   initargs=(opts['tokenizer_class'], {},
-                             opts['db_class'], {}))
-
-    logger.info('Searching documents...')
+    batch_size_ = opts_['batch_size']
     cnt = 0
-    inputs = [(ranked[i], q_tokens[i], answers[i]) for i in range(len(ranked))]
-    search_fn = partial(search_docs, max_ex=opts['max_ex'], opts=opts['search'])
-    with open(outfile + '.dstrain.txt', 'w') as f_train, \
-         open(outfile + '.dsdev.txt', 'w') as f_dev:
-        for res in workers.imap_unordered(search_fn, inputs):
-            for ex in res:
-                cnt += 1
-                f = f_dev if random.random() < opts['dev_split'] else f_train
-                f.write(json.dumps(ex))
-                f.write('\n')
-                if cnt % 1000 == 0:
-                    logging.info('%d results so far...' % cnt)
-    workers.close()
-    workers.join()
+    batch_no = 1
+    total_batches = int(len(questions_)/batch_size_) + 1
+    with open(outfile_ + '.dstrain.txt', 'w') as f_train, open(outfile_ + '.dsdev.txt', 'w') as f_dev:
+        for batch_questions, batch_answers in gen_pairs(questions_, answers_, batch_size_):
+            logger.info('Processing %d/%d question answer pairs...' % (batch_no, total_batches))
+
+            ranked = ranker.batch_closest_docs(batch_questions, k=opts_['n_docs'])
+            ranked = [r[2] for r in ranked]
+            # print(ranked)
+            # Start pool of tokenizers with ner enabled
+            workers = Pool(opts_['workers'], initializer=init,
+                           initargs=(opts_['tokenizer_class'], {'annotators': {'ner'}}))
+
+            logger.info('Pre-tokenizing questions...')
+            q_tokens = workers.map(tokenize_text, batch_questions)
+            q_ner = workers.map(nltk_entity_groups, batch_questions)
+            q_tokens = list(zip(q_tokens, q_ner))
+            workers.close()
+            workers.join()
+
+            # Start pool of simple tokenizers + db connections
+            workers = Pool(opts_['workers'], initializer=init,
+                           initargs=(opts_['tokenizer_class'], {},
+                                     opts_['db_class'], {}))
+
+            logger.info('Searching documents...')
+
+            inputs = [(ranked[i], q_tokens[i], batch_answers[i]) for i in range(len(ranked))]
+            search_fn = partial(search_docs, max_ex=opts_['max_ex'], opts=opts_['search'])
+            for res in workers.imap_unordered(search_fn, inputs):
+                for ex in res:
+                    cnt += 1
+                    f = f_dev if random.random() < opts_['dev_split'] else f_train
+                    f.write(json.dumps(ex))
+                    f.write('\n')
+
+            workers.close()
+            workers.join()
+            logging.info('%d results so far...' % cnt)
+            batch_no += 1
     logging.info('Finished. Total = %d' % cnt)
 
 
@@ -256,6 +270,8 @@ if __name__ == "__main__":
                          help='Maximum matches generated per question')
     general.add_argument('--n-docs', type=int, default=150,
                          help='Number of docs retrieved per question')
+    general.add_argument('--batch_size', type=int, default=1000,
+                         help='Number of qa pairs to process at one time')
     general.add_argument('--tokenizer', type=str, default='corenlp')
     general.add_argument('--ranker', type=str, default='lucene')
     general.add_argument('--db', type=str, default='sqlite')
@@ -303,6 +319,7 @@ if __name__ == "__main__":
         'tokenizer_class': tokenizers.get_class(args.tokenizer),
         'db_class': None,
         'search': {k: vars(args)[k] for k in search_keys},
+        'batch_size': args.batch_size
     }
     opts.update(vars(args))
 
