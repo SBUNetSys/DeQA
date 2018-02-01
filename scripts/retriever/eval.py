@@ -79,9 +79,9 @@ def get_score(answer_doc, match):
     answers_ = list(set(answers_))  # remove duplicates
     for doc_id, doc_text in zip(doc_ids, doc_texts):
         if has_answer(answers_, doc_text, match):
-            print('answer:', answers_, 'docID:', doc_id, 1)
+            # print('answer:', answers_, 'docID:', doc_id, 1)
             return 1
-    print('answer:', answers_, 'docID:', 0, 0)
+    # print('answer:', answers_, 'docID:', 0, 0)
     return 0
 
 
@@ -106,8 +106,8 @@ if __name__ == '__main__':
     parser.add_argument('--db_path', type=str, default=None,
                         help='Path to Document DB or index')
     parser.add_argument('--tokenizer', type=str, default='regexp')
-    parser.add_argument('--use_keyword', action='store_true')
-    parser.add_argument('--n-docs', type=int, default=5)
+    parser.add_argument('--sim_func', type=str, default='lm')
+    parser.add_argument('--n-docs', type=int, default=150)
     parser.add_argument('--num-workers', type=int, default=None)
     parser.add_argument('--match', type=str, default='string',
                         choices=['regex', 'string'])
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     logger.info('Initializing ranker...')
 
     if args.ranker.lower().startswith('g'):
-        ranker = retriever.get_class('galago')(use_keyword=args.use_keyword, index_path=args.db_path)
+        ranker = retriever.get_class('galago')(use_keyword=True, index_path=args.db_path)
     elif args.ranker.lower().startswith('s'):
         ranker = retriever.get_class('sql')(db_path=args.db_path)
     elif args.ranker.lower().startswith('l'):

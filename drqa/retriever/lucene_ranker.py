@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 TEXT_FLAG = '|TEXT:===>|'
 DATA_DIR = (os.path.join(PosixPath(__file__).absolute().parents[2].as_posix(), 'data'))
 DEFAULTS = {
-    'lucene_path': os.path.join(DATA_DIR, 'LuceneTrecEnWiki-0.2/bin/LuceneTrecEnWiki'),
+    'lucene_path': os.path.join(DATA_DIR, 'LuceneTrec-0.3/bin/LuceneTrec'),
     'lucene_index': os.path.join(DATA_DIR, 'wikipedia/enwiki-lucene-20180120/')
 }
 
@@ -22,10 +22,11 @@ class LuceneRanker(object):
     """Use Galago search engine to retrieve wikipedia articles
     """
 
-    def __init__(self, lucene_path=None, index_path=None, use_keyword=True):
+    def __init__(self, lucene_path=None, index_path=None, sim_function='lm'):
         self.question = None
         self.lucene_path = lucene_path or DEFAULTS['lucene_path']
         self.index_path = index_path or DEFAULTS['lucene_index']
+        self.sim_func = sim_function
         self.tokenizer = tokenizers.get_class('simple')()
 
     def parse(self, query):
@@ -81,7 +82,7 @@ class LuceneRanker(object):
         :param query:
         :return:
         """
-        args = [self.lucene_path, 'search', self.index_path, query, '%d' % top_n]
+        args = [self.lucene_path, 'search', self.index_path, query, '%d' % top_n, self.sim_func]
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         if err:
