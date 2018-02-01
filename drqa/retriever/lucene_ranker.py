@@ -43,7 +43,7 @@ class LuceneRanker(object):
         doc_texts = []
         words = self.parse(utils.normalize(question_))
         query = ' '.join(words)
-        if query.strip() is None:
+        if not query:
             logger.warning('has no query!')
             return doc_ids, doc_scores, doc_texts
         search_results = self._run_lucene(query, k)
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     console.setFormatter(fmt)
     logger.addHandler(console)
     ranker = LuceneRanker()
-    question = 'What sports stadium has been billed as "the eighth wonder of the world"?'
+    question = 'What is Renaixença'
     ids, scores, texts = ranker.closest_docs(question, k=10)
     for doc_id, doc_score, doc_text in zip(ids, scores, texts):
         print(doc_id, doc_score, doc_text)

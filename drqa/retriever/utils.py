@@ -81,7 +81,7 @@ STOPWORDS = {
     'will', 'just', 'don', 'should', 'now', 'd', 'll', 'm', 'o', 're', 've',
     'y', 'ain', 'aren', 'couldn', 'didn', 'doesn', 'hadn', 'hasn', 'haven',
     'isn', 'ma', 'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn', 'weren',
-    'won', 'wouldn', "'ll", "'re", "'ve", "n't", "'s", "'d", "'m", "''", "``", "^"
+    'won', 'wouldn', "'ll", "'re", "'ve", "n't", "'s", "'d", "'m", "''", "``", "^", "+"
 }
 
 
