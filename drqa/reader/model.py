@@ -109,6 +109,9 @@ class DocReader(object):
         with open(embedding_file, encoding="utf-8") as f:
             for line in f:
                 parsed = line.rstrip().split(' ')
+                if len(parsed) == 2:
+                    # skip fast text first line header, which should be: 2519370 300
+                    continue
                 assert (len(parsed) == embedding.size(1) + 1)
                 w = self.word_dict.normalize(parsed[0])
                 if w in words:

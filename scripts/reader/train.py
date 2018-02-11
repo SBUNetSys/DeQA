@@ -148,6 +148,7 @@ def set_defaults(args):
     # Embeddings options
     if args.embedding_file:
         with open(args.embedding_file, encoding="utf-8") as f:
+            next(f)  # handle fasttext format correctly
             dim = len(f.readline().strip().split(' ')) - 1
         args.embedding_dim = dim
     elif not args.embedding_dim:
