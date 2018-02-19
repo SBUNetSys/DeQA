@@ -145,7 +145,7 @@ class RnnDocReader(nn.Module):
         logger.debug('question_self_attn [time]: %.4f s' % (t8 - t7))
         question_hidden = layers.weighted_avg(question_hiddens, q_merge_weights)
         t9 = time.time()
-        logger.debug('question_weighted_avg [time]: %.4f s' % (t9 - t7))
+        logger.debug('question_weighted_avg [time]: %.4f s' % (t9 - t8))
         # Predict start and end positions
         start_scores = self.start_attn(doc_hiddens, question_hidden, x1_mask)
         t10 = time.time()
