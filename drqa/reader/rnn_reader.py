@@ -127,14 +127,14 @@ class RnnDocReader(nn.Module):
 
         # Encode document with RNN
         t5 = time.time()
-        doc_hiddens = self.doc_rnn(torch.cat(drnn_input, 2), x1_mask)
+        question_hiddens = self.question_rnn(x2_emb, x2_mask)
         t6 = time.time()
-        logger.debug('doc_rnn [time]: %.4f s' % (t6 - t5))
+        logger.debug('question_rnn [time]: %.4f s' % (t6 - t5))
 
         # Encode question with RNN + merge hiddens
-        question_hiddens = self.question_rnn(x2_emb, x2_mask)
         t7 = time.time()
-        logger.debug('question_rnn [time]: %.4f s' % (t7 - t6))
+        doc_hiddens = self.doc_rnn(torch.cat(drnn_input, 2), x1_mask)
+        logger.debug('doc_rnn [time]: %.4f s' % (t7 - t6))
         if self.args.question_merge == 'avg':
             q_merge_weights = layers.uniform_weights(question_hiddens, x2_mask)
         elif self.args.question_merge == 'self_attn':

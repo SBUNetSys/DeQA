@@ -434,9 +434,7 @@ class DocReader(object):
     @staticmethod
     def load(filename, new_args=None, normalize=True):
         logger.info('Loading model %s' % filename)
-        saved_params = torch.load(
-            filename, map_location=lambda storage, loc: storage
-        )
+        saved_params = torch.load(filename, map_location=lambda storage, loc: storage)
         word_dict = saved_params['word_dict']
         feature_dict = saved_params['feature_dict']
         state_dict = saved_params['state_dict']
