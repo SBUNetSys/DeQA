@@ -77,7 +77,7 @@ def add_model_args(parser):
                        help='Whether to dropout the RNN output')
     optim.add_argument('--optimizer', type=str, default='adamax',
                        help='Optimizer: sgd or adamax')
-    optim.add_argument('--learning-rate', type=float, default=0.1,
+    optim.add_argument('--learning-rate', type=float, default=0.001,
                        help='Learning rate for SGD only')
     optim.add_argument('--grad-clipping', type=float, default=10,
                        help='Gradient clipping')
