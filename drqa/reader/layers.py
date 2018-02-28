@@ -39,11 +39,12 @@ class StackedBRNN(nn.Module):
         self.num_layers = num_layers
         self.concat_layers = concat_layers
         self.rnns = nn.ModuleList()
-
+        self.use_sru = False
         if rnn_type == 'SRU':
             try:
                 import sru
                 rnn_type = sru.SRUCell
+                self.use_sru = True
             except ImportError:
                 logger.info('no sru installed, use LSTM as default')
                 rnn_type = nn.LSTM
@@ -68,7 +69,7 @@ class StackedBRNN(nn.Module):
         Output:
             x_encoded: batch * len * hdim_encoded
         """
-        if x_mask.data.sum() == 0:
+        if x_mask.data.sum() == 0 or self.use_sru:
             # No padding necessary.
             output = self._forward_unpadded(x, x_mask)
         elif self.padding or not self.training:
