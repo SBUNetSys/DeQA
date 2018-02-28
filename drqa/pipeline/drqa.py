@@ -6,24 +6,25 @@
 # LICENSE file in the root directory of this source tree.
 """Full DrQA pipeline."""
 
-import torch
-import regex
 import heapq
-import math
 import json
-from collections import Counter
+import logging
+import math
 import os
+import time
+from collections import Counter
 from multiprocessing import Pool as ProcessPool
 from multiprocessing.util import Finalize
 
-from ..reader.vector import batchify
-from ..reader.data import ReaderDataset, SortedBatchSampler
+import regex
+import torch
+
+from . import DEFAULTS
 from .. import reader
 from .. import tokenizers
-from . import DEFAULTS
-import logging
+from ..reader.data import ReaderDataset, SortedBatchSampler
 from ..reader.utils import slugify
-import time
+from ..reader.vector import batchify
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,8 @@ class DrQA(object):
             data_parallel=False,
             max_loaders=5,
             num_workers=None,
-            ranker=None
+            ranker=None,
+            features_dir=None
     ):
         """Initialize the pipeline.
 
@@ -87,16 +89,21 @@ class DrQA(object):
               (default is fine).
             num_workers: number of parallel CPU processes to use for tokenizing
               and post processing resuls.
-            ranker_config: config for ranker.
         """
         self.batch_size = batch_size
         self.max_loaders = max_loaders
         self.fixed_candidates = fixed_candidates is not None
         self.cuda = cuda
 
-        feat_dir = DEFAULTS['features']
-        if not os.path.exists(feat_dir):
-            os.makedirs(feat_dir)
+        self.features_dir = features_dir
+        annotators = set()
+        if self.features_dir:
+            annotators.add('pos')
+            annotators.add('ner')
+            # annotators = tokenizers.get_annotators_for_model(self.reader)
+            if not os.path.exists(features_dir):
+                os.makedirs(features_dir)
+        tok_opts = {'annotators': annotators}
 
         logger.info('Initializing document ranker...')
         self.ranker = ranker
@@ -132,11 +139,6 @@ class DrQA(object):
             tok_class = tokenizers.get_class(tokenizer)
 
         logger.debug('annotators')
-        # annotators = set()
-        # annotators.add('pos')
-        # annotators.add('ner')
-        annotators = tokenizers.get_annotators_for_model(self.reader)
-        tok_opts = {'annotators': annotators}
 
         self.num_workers = num_workers
         self.processes = ProcessPool(
@@ -243,8 +245,26 @@ class DrQA(object):
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.
         examples = []
+        word_dict = self.reader.word_dict
         for qidx in range(len(queries)):
             q_text = q_tokens[qidx].words()
+            if self.features_dir:
+                q_id = slugify(queries[qidx])
+                q_feat_file = os.path.join(self.features_dir, '%s.json' % q_id)
+                if not os.path.exists(q_feat_file):
+                    para_length = len(q_text)
+                    counter = Counter(q_text)
+                    tf = [round(counter[w] * 1.0 / para_length, 6) for w in q_text]
+                    idx = [word_dict[w] for w in q_text]
+                    record = {
+                        'idx': idx,
+                        'pos': q_tokens[qidx].pos(),
+                        'ner': q_tokens[qidx].entities(),
+                        'tf': tf
+                    }
+                    with open(q_feat_file, 'w') as f:
+                        f.write(json.dumps(record, sort_keys=True))
+
             para_lens = []
             for rel_didx, did in enumerate(all_docids[qidx]):
                 start, end = didx2sidx[did2didx[did]]
@@ -262,27 +282,29 @@ class DrQA(object):
                             'doc_score': float(all_doc_scores[qidx][rel_didx])
                         })
                         para_lens.append(len(s_tokens[sidx].words()))
-
+                        if self.features_dir:
+                            feat_file = os.path.join(self.features_dir, '%s.json' % did)
+                            if not os.path.exists(feat_file):
+                                para_length = len(para_text)
+                                counter = Counter(para_text)
+                                tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
+                                idx = [word_dict[w] for w in para_text]
+                                record = {
+                                    'pos': s_tokens[sidx].pos(),
+                                    'ner': s_tokens[sidx].entities(),
+                                    'tf': tf,
+                                    'idx': idx
+                                }
+                                with open(feat_file, 'w') as f:
+                                    f.write(json.dumps(record, sort_keys=True))
             logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
 
-        # Push all examples through the document reader.
-        # We decode argmax start/end indices asychronously on CPU.
         result_handles = []
-        num_loaders = min(self.max_loaders, math.floor(len(examples) / 1e3))
+        num_loaders = min(self.max_loaders, int(math.floor(len(examples) / 1e3)))
         for batch in self._get_loader(examples, num_loaders):
-            if candidates or self.fixed_candidates:
-                batch_cands = []
-                for ex_id in batch[-1]:
-                    batch_cands.append({
-                        'input': s_tokens[ex_id[2]],
-                        'cands': candidates[ex_id[0]] if candidates else None
-                    })
-                handle = self.reader.predict(batch, batch_cands, async_pool=self.processes)
-            else:
-                handle = self.reader.predict(batch, async_pool=self.processes)
-
+            handle = self.reader.predict(batch, async_pool=self.processes)
             result_handles.append((handle, batch[-1], batch[0].size(0)))
 
         t8 = time.time()

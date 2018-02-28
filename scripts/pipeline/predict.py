@@ -15,7 +15,6 @@ import logging
 import sys
 from drqa import pipeline, retriever
 from drqa.retriever import utils
-from drqa.retriever import GalagoRanker
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -60,8 +59,9 @@ parser.add_argument('--batch-size', type=int, default=128,
                     help='Document paragraph batching size')
 parser.add_argument('--predict-batch-size', type=int, default=1,
                     help='Question batching size')
-parser.add_argument('--ranker', type=str, default='lucene',)
+parser.add_argument('--ranker', type=str, default='lucene')
 parser.add_argument('--use_keyword', action='store_true')
+parser.add_argument('--features_dir', type=str, default=None)
 parser.add_argument("-v", "--verbose", help="log more debug info",
                     action="store_true")
 
@@ -114,6 +114,7 @@ DrQA = pipeline.DrQA(
     data_parallel=args.parallel,
     ranker=ranker,
     num_workers=args.num_workers,
+    features_dir=args.features_dir
 )
 
 # ------------------------------------------------------------------------------
