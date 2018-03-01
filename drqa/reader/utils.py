@@ -28,7 +28,7 @@ def load_data(args, filename, skip_no_answer=False):
     One example per line, JSON encoded.
     """
     # Load JSON lines
-    with open(filename, encoding="utf-8") as f:
+    with open(filename) as f:
         examples = [json.loads(line) for line in f]
 
     # Make case insensitive?
@@ -49,7 +49,7 @@ def load_data(args, filename, skip_no_answer=False):
 def load_text(filename):
     """Load the paragraphs only of a SQuAD dataset. Store as qid -> text."""
     # Load JSON file
-    with open(filename, encoding="utf-8") as f:
+    with open(filename) as f:
         examples = json.load(f)['data']
 
     texts = {}
@@ -63,7 +63,7 @@ def load_text(filename):
 def load_answers(filename):
     """Load the answers only of a SQuAD dataset. Store as qid -> [answers]."""
     # Load JSON file
-    with open(filename, encoding="utf-8") as f:
+    with open(filename) as f:
         examples = json.load(f)['data']
 
     ans = {}
@@ -82,7 +82,7 @@ def load_answers(filename):
 def index_embedding_words(embedding_file):
     """Put all the words in embedding_file into a set."""
     words = set()
-    with open(embedding_file, encoding="utf-8") as f:
+    with open(embedding_file) as f:
         for line in f:
             w = Dictionary.normalize(line.rstrip().split(' ')[0])
             words.add(w)
@@ -91,6 +91,7 @@ def index_embedding_words(embedding_file):
 
 def load_words(args, examples):
     """Iterate and index all the words in examples (documents + questions)."""
+
     def _insert(iterable):
         for w in iterable:
             w = Dictionary.normalize(w)
@@ -135,6 +136,7 @@ def top_question_words(args, examples, word_dict):
 
 def build_feature_dict(args, examples):
     """Index features (one hot) from fields in examples and options."""
+
     def _insert(feature):
         if feature not in feature_dict:
             feature_dict[feature] = len(feature_dict)
@@ -183,6 +185,7 @@ def slugify(value):
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
         return re.sub(r'\b(a|an|the)\b', ' ', text)
 
@@ -296,3 +299,15 @@ class Timer(object):
         if self.running:
             return self.total + time.time() - self.start
         return self.total
+
+
+def aggregate(data_):
+    """
+    compute aggregated statistical feature for data
+    :param data_: input data, vector or matrix
+    :return: max, mean, std, var
+    """
+    import numpy as np
+    features = np.max(data_, 0).flatten().tolist() + np.mean(data_, 0).flatten().tolist() \
+               + np.std(data_, 0).flatten().tolist() + np.var(data_, 0).flatten().tolist()
+    return features

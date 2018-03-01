@@ -141,8 +141,10 @@ class Tokenizer(object):
            'PRP', 'NNS', 'VBN', '``', 'NNPS', "''", 'TO', 'WRB', 'VBD', 'CD', '-LRB-',
            'WDT', '-RRB-', 'RBS', 'VBP', 'VB', 'JJS', ':', 'PRP$', 'WP', 'JJR', '$', 'RP',
            'MD', 'EX', '#', 'RBR', 'FW', 'WP$', 'UH', 'PDT', 'SYM', 'LS']
+    FEAT = NER + POS
     NER_DICT = {f: i for i, f in enumerate(NER)}
     POS_DICT = {f: i for i, f in enumerate(POS)}
+    FEAT_DICT = {f: i for i, f in enumerate(FEAT)}
 
     def tokenize(self, text):
         raise NotImplementedError
