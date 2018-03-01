@@ -81,11 +81,28 @@ def process_batch(retriever, questions, save_dir, n_docs=5, processes=None, num_
     t4 = time.time()
     logger.info('docs retrieved [time]: %.4f s' % (t4 - t3))
     all_doc_ids, all_doc_scores, all_doc_texts = zip(*ranked)
+    # Flatten document ids and retrieve text from database.
+    # We remove duplicates for processing efficiency.
+    flat_docids, flat_doc_texts = zip(*{(d, t) for doc_ids, doc_texts in zip(all_doc_ids, all_doc_texts)
+                                        for d, t in zip(doc_ids, doc_texts)})
 
+    did2didx = {did: didx for didx, did in enumerate(flat_docids)}
+
+    # Split and flatten documents. Maintain a mapping from doc (index in
+    # flat list) to split (index in flat list).
+    flat_splits = []
+    didx2sidx = []
+    for text in flat_doc_texts:
+        splits = _split_doc(text)
+        didx2sidx.append([len(flat_splits), -1])
+        for split in splits:
+            flat_splits.append(split)
+        didx2sidx[-1][1] = len(flat_splits)
+    logger.debug('doc_texts flattened')
     q_tokens = processes.map_async(tokenize_text, questions)
     logger.info('begin tokenizing...')
     logger.debug('doc ids are:(%s)' % ','.join([i for j in all_doc_ids for i in j]))
-    s_tokens = processes.map_async(tokenize_text, [i for j in all_doc_texts for i in j])
+    s_tokens = processes.map_async(tokenize_text, flat_splits)
     q_tokens = q_tokens.get()
     s_tokens = s_tokens.get()
     # logger.info('q_tokens: %s' % q_tokens)
@@ -111,24 +128,25 @@ def process_batch(retriever, questions, save_dir, n_docs=5, processes=None, num_
                 f.write(json.dumps(record, sort_keys=True))
 
         para_lens = []
-        for s_id, doc_id in enumerate(all_doc_ids[qid]):
-            doc_pos = qid*n_docs + s_id
-            para_text = s_tokens[doc_pos].words()
-            if len(q_text) > 0 and len(para_text) > 0:
-                para_lens.append(len(s_tokens[doc_pos].words()))
-                feat_file = os.path.join(save_dir, '%s.json' % doc_id)
-                if not os.path.exists(feat_file):
-                    para_length = len(para_text)
-                    counter = Counter(para_text)
-                    tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
-                    record = {
-                        'pos': s_tokens[doc_pos].pos(),
-                        'ner': s_tokens[doc_pos].entities(),
-                        'tf': tf,
-                        'words': para_text
-                    }
-                    with open(feat_file, 'w') as f:
-                        f.write(json.dumps(record, sort_keys=True))
+        for rel_didx, did in enumerate(all_doc_ids[qid]):
+            start, end = didx2sidx[did2didx[did]]
+            for sidx in range(start, end):
+                para_text = s_tokens[sidx].words()
+                if len(q_text) > 0 and len(para_text) > 0:
+                    para_lens.append(len(s_tokens[sidx].words()))
+                    feat_file = os.path.join(save_dir, '%s.json' % did)
+                    if not os.path.exists(feat_file):
+                        para_length = len(para_text)
+                        counter = Counter(para_text)
+                        tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
+                        record = {
+                            'pos': s_tokens[sidx].pos(),
+                            'ner': s_tokens[sidx].entities(),
+                            'tf': tf,
+                            'words': para_text
+                        }
+                        with open(feat_file, 'w') as f:
+                            f.write(json.dumps(record, sort_keys=True))
         logger.debug('question_p: %s paragraphs: %s' % (questions[qid], para_lens))
     t7 = time.time()
     logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
@@ -187,7 +205,7 @@ if __name__ == '__main__':
                for i in range(0, len(queries), args.batch_size)]
     for i, batch in enumerate(batches):
         batch_info = '-' * 5 + ' Batch %d/%d ' % (i + 1, len(batches)) + '-' * 5 + ' '
-        start_query = queries[i]
+        start_query = batch[0]
         logger.info(batch_info + start_query)
         process_batch(ranker, batch, args.save_dir, args.n_docs, pool)
 

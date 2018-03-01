@@ -101,9 +101,6 @@ class DrQA(object):
 
         self.features_dir = features_dir
 
-        annotators = tokenizers.get_annotators_for_model(self.reader)
-        tok_opts = {'annotators': annotators}
-
         logger.info('Initializing document ranker...')
         self.ranker = ranker
 
@@ -130,6 +127,9 @@ class DrQA(object):
         if data_parallel:
             logger.info('data_parallel')
             self.reader.parallelize()
+
+        annotators = tokenizers.get_annotators_for_model(self.reader)
+        tok_opts = {'annotators': annotators}
 
         logger.debug('tokenizer')
         if not tokenizer:
@@ -203,7 +203,7 @@ class DrQA(object):
             predictions = self.process_batch_et(query, n_docs)
         else:
             predictions = self.process_batch(query, top_n=top_n, n_docs=n_docs)
-        return predictions[0]
+        return predictions
 
     def process_batch(self, queries, top_n=1, n_docs=5,
                       return_context=False):
@@ -258,7 +258,6 @@ class DrQA(object):
         # Group into structured example inputs. Examples' ids represent
         # mappings to their question, document, and split ids.
         examples = []
-        word_dict = self.reader.word_dict
         for qidx in range(len(queries)):
             q_text = q_tokens[qidx].words()
             para_lens = []
@@ -503,7 +502,7 @@ class DrQA(object):
             }
             predictions_.append(prediction)
             if stop_rank:
-                if i + p_count + 1 >= stop_rank:
+                if i + p_count >= stop_rank:
                     should_stop = True
                     break
             else:

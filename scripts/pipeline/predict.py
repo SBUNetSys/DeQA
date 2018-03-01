@@ -16,7 +16,6 @@ import time
 import torch
 
 from drqa import pipeline, retriever
-from drqa.retriever import utils
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -36,9 +35,9 @@ parser.add_argument('--retriever-model', type=str, default=None,
                     help="Path to Document Retriever model (tfidf)")
 parser.add_argument('--db_path', type=str, default=None,
                     help='Path to Document DB or index')
-parser.add_argument('--n-docs', type=int, default=150,
+parser.add_argument('--n_docs', type=int, default=150,
                     help="Number of docs to retrieve per query")
-parser.add_argument('--top-n', type=int, default=150,
+parser.add_argument('--top_n', type=int, default=150,
                     help="Number of predictions to make per query")
 parser.add_argument('--tokenizer', type=str, default='simple',
                     help=("String option specifying tokenizer type to use "
@@ -58,6 +57,8 @@ parser.add_argument('--ranker', type=str, default='lucene')
 parser.add_argument('--features_dir', type=str, default=None)
 parser.add_argument('--stop_rank', type=int, default=None,
                     help='how many passages to process')
+parser.add_argument('--et_threshold', type=float, default=None,
+                    help='early stopping threshold')
 parser.add_argument("-v", "--verbose", help="log more debug info", action="store_true")
 
 args = parser.parse_args()
@@ -90,7 +91,6 @@ else:
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
     reader_model=args.reader_model,
-    embedding_file=args.embedding_file,
     tokenizer=args.tokenizer,
     batch_size=args.batch_size,
     cuda=args.cuda,
@@ -98,6 +98,7 @@ DrQA = pipeline.DrQA(
     ranker=ranker,
     num_workers=args.num_workers,
     features_dir=args.features_dir,
+    et_threshold=args.et_threshold,
     stop_rank=args.stop_rank
 )
 
