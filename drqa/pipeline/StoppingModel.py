@@ -13,7 +13,6 @@ from drqa.tokenizers.tokenizer import Tokenizer
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
-H = 32
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
 DIM = 1 * 4 + 4 * NLP_NUM * 2 + NLP_NUM

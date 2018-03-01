@@ -7,12 +7,13 @@
 """DrQA reader utilities."""
 
 import json
-import time
 import logging
 import string
+import time
+from collections import Counter
+
 import regex as re
 
-from collections import Counter
 from .data import Dictionary
 
 logger = logging.getLogger(__name__)

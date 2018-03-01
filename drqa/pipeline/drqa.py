@@ -20,11 +20,13 @@ import regex
 import torch
 
 from . import DEFAULTS
+from .StoppingModel import EarlyStoppingModel
 from .. import reader
 from .. import tokenizers
 from ..reader.data import ReaderDataset, SortedBatchSampler
-from ..reader.utils import slugify
+from ..reader.utils import slugify, aggregate
 from ..reader.vector import batchify
+from ..tokenizers.tokenizer import Tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,9 @@ class DrQA(object):
             max_loaders=5,
             num_workers=None,
             ranker=None,
-            features_dir=None
+            features_dir=None,
+            et_threshold=None,
+            stop_rank=None
     ):
         """Initialize the pipeline.
 
@@ -96,13 +100,8 @@ class DrQA(object):
         self.cuda = cuda
 
         self.features_dir = features_dir
-        annotators = set()
-        if self.features_dir:
-            annotators.add('pos')
-            annotators.add('ner')
-            # annotators = tokenizers.get_annotators_for_model(self.reader)
-            if not os.path.exists(features_dir):
-                os.makedirs(features_dir)
+
+        annotators = tokenizers.get_annotators_for_model(self.reader)
         tok_opts = {'annotators': annotators}
 
         logger.info('Initializing document ranker...')
@@ -141,11 +140,18 @@ class DrQA(object):
         logger.debug('annotators')
 
         self.num_workers = num_workers
-        self.processes = ProcessPool(
-            num_workers,
-            initializer=init,
-            initargs=(tok_class, tok_opts, fixed_candidates)
-        )
+        self.processes = ProcessPool(num_workers,
+                                     initializer=init,
+                                     initargs=(tok_class, tok_opts, fixed_candidates))
+        self.stop_rank = stop_rank
+        if et_threshold:
+            self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.5
+            logger.info('Initializing early stopping model...')
+            et_model = DEFAULTS['linear_model']
+            self.et_model = EarlyStoppingModel.load(et_model)
+            logger.info('early stopping model (et threshold: %s) loaded.' % self.et_threshold)
+        else:
+            self.et_threshold = None
 
     def _split_doc(self, doc):
         """Given a doc, split it into chunks (by paragraph)."""
@@ -183,16 +189,23 @@ class DrQA(object):
         )
         return loader
 
-    def process(self, query, candidates=None, top_n=1, n_docs=5,
-                return_context=False):
+    def process_single(self, query, top_n=1, n_docs=5,
+                       return_context=False):
         """Run a single query."""
         predictions = self.process_batch(
-            [query], [candidates] if candidates else None,
+            [query],
             top_n, n_docs, return_context
         )
         return predictions[0]
 
-    def process_batch(self, queries, candidates=None, top_n=1, n_docs=5,
+    def process(self, query, top_n=1, n_docs=5):
+        if self.stop_rank or self.et_threshold:
+            predictions = self.process_batch_et(query, n_docs)
+        else:
+            predictions = self.process_batch(query, top_n=top_n, n_docs=n_docs)
+        return predictions[0]
+
+    def process_batch(self, queries, top_n=1, n_docs=5,
                       return_context=False):
         """Run a batch of queries (more efficient)."""
         t3 = time.time()
@@ -248,23 +261,6 @@ class DrQA(object):
         word_dict = self.reader.word_dict
         for qidx in range(len(queries)):
             q_text = q_tokens[qidx].words()
-            if self.features_dir:
-                q_id = slugify(queries[qidx])
-                q_feat_file = os.path.join(self.features_dir, '%s.json' % q_id)
-                if not os.path.exists(q_feat_file):
-                    para_length = len(q_text)
-                    counter = Counter(q_text)
-                    tf = [round(counter[w] * 1.0 / para_length, 6) for w in q_text]
-                    idx = [word_dict[w] for w in q_text]
-                    record = {
-                        'idx': idx,
-                        'pos': q_tokens[qidx].pos(),
-                        'ner': q_tokens[qidx].entities(),
-                        'tf': tf
-                    }
-                    with open(q_feat_file, 'w') as f:
-                        f.write(json.dumps(record, sort_keys=True))
-
             para_lens = []
             for rel_didx, did in enumerate(all_docids[qidx]):
                 start, end = didx2sidx[did2didx[did]]
@@ -282,21 +278,6 @@ class DrQA(object):
                             'doc_score': float(all_doc_scores[qidx][rel_didx])
                         })
                         para_lens.append(len(s_tokens[sidx].words()))
-                        if self.features_dir:
-                            feat_file = os.path.join(self.features_dir, '%s.json' % did)
-                            if not os.path.exists(feat_file):
-                                para_length = len(para_text)
-                                counter = Counter(para_text)
-                                tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
-                                idx = [word_dict[w] for w in para_text]
-                                record = {
-                                    'pos': s_tokens[sidx].pos(),
-                                    'ner': s_tokens[sidx].entities(),
-                                    'tf': tf,
-                                    'idx': idx
-                                }
-                                with open(feat_file, 'w') as f:
-                                    f.write(json.dumps(record, sort_keys=True))
             logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
@@ -353,3 +334,189 @@ class DrQA(object):
                     (len(queries), time.time() - t3))
 
         return all_predictions
+
+    def process_batch_et(self, queries, n_docs):
+        """Run a batch of queries (more efficient)."""
+        t3 = time.time()
+        logger.info('ET Processing %d queries...' % len(queries))
+        logger.info('ET Retrieving top %d docs...' % n_docs)
+
+        # Rank documents for queries.
+        if len(queries) == 1:
+            ranked = [self.ranker.closest_docs(queries[0], k=n_docs)]
+        else:
+            ranked = self.ranker.batch_closest_docs(queries, k=n_docs, num_workers=self.num_workers)
+
+        t4 = time.time()
+        logger.info('ET docs retrieved [time]: %.4f s' % (t4 - t3))
+        all_docids, all_doc_scores, all_doc_texts = zip(*ranked)
+
+        # Flatten document ids and retrieve text from database.
+        # We remove duplicates for processing efficiency.
+        flat_docids, flat_doc_texts = zip(*{(d, t) for doc_ids, doc_texts in zip(all_docids, all_doc_texts)
+                                            for d, t in zip(doc_ids, doc_texts)})
+
+        # flat_docids = list({d for docids in all_docids for d in docids})
+        did2didx = {did: didx for didx, did in enumerate(flat_docids)}
+        # flat_doc_texts = list({t for doc_texts in all_doc_texts for t in doc_texts})
+        # logger.info('doc_texts for top %d docs extracted' % n_docs)
+
+        # Split and flatten documents. Maintain a mapping from doc (index in
+        # flat list) to split (index in flat list).
+        flat_splits = []
+        didx2sidx = []
+        for text in flat_doc_texts:
+            splits = self._split_doc(text)
+            didx2sidx.append([len(flat_splits), -1])
+            for split in splits:
+                flat_splits.append(split)
+            didx2sidx[-1][1] = len(flat_splits)
+        t5 = time.time()
+        logger.debug('ET doc_texts flattened')
+
+        # Push through the tokenizers as fast as possible.
+        q_tokens = self.processes.map_async(tokenize_text, queries)
+        s_tokens = self.processes.map_async(tokenize_text, flat_splits)
+        q_tokens = q_tokens.get()
+        s_tokens = s_tokens.get()
+        # logger.info('q_tokens: %s' % q_tokens)
+        # logger.info('s_tokens: %s' % s_tokens)
+        t6 = time.time()
+        logger.info('ET doc texts tokenized [time]: %.4f s' % (t6 - t5))
+
+        # Group into structured example inputs. Examples' ids represent
+        # mappings to their question, document, and split ids.
+        examples = []
+        q_text = q_tokens[0].words()
+        q_id = slugify(queries[0])
+        q_feat_file = os.path.join(self.features_dir, '%s.json' % q_id)
+        n_q = [0 for _ in Tokenizer.FEAT]
+        if os.path.exists(q_feat_file):
+            record = json.load(open(q_feat_file))
+            q_ner = record['ner']
+            q_pos = record['pos']
+            for feat in q_ner + q_pos:
+                n_q[Tokenizer.FEAT_DICT[feat]] += 1
+        else:
+            logger.warning('no question ner and pos file: %s' % q_feat_file)
+
+        f_nq = list(map(float, n_q))
+        para_lens = []
+        p_pos = dict()
+        p_ner = dict()
+        for rel_didx, did in enumerate(all_docids[0]):
+            start, end = didx2sidx[did2didx[did]]
+            for sidx in range(start, end):
+                para_text = s_tokens[sidx].words()
+                if len(q_text) > 0 and len(para_text) > 10:
+                    examples.append({
+                        'id': (rel_didx, sidx),
+                        'question': q_text,
+                        'qlemma': q_tokens[0].lemmas(),
+                        'document': para_text,
+                        'lemma': s_tokens[sidx].lemmas(),
+                        'doc_score': float(all_doc_scores[0][rel_didx])
+                    })
+                    para_lens.append(len(para_text))
+
+                    feat_file = os.path.join(self.features_dir, '%s.json' % did)
+                    if os.path.exists(feat_file):
+                        record = json.load(open(feat_file))
+                        p_ner[did] = record['ner']
+                        p_pos[did] = record['pos']
+                    else:
+                        logger.warning('no paragraph ner and pos file: %s' % feat_file)
+
+            logger.debug('question_p: %s paragraphs: %s' % (queries[0], para_lens))
+        t7 = time.time()
+        logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
+        num_loaders = min(self.max_loaders, int(math.floor(len(examples) / 1e3)))
+        all_predictions = []
+        predictions = []
+
+        all_n_p = []
+        all_n_a = []
+        all_p_scores = []
+        processed_count = 0
+        for batch in self._get_loader(examples, num_loaders):
+            handle = self.reader.predict(batch, async_pool=self.processes)
+            starts, ends, ans_scores = handle.get()
+            starts = [s[0] for s in starts]
+            ends = [e[0] for e in ends]
+            ans_scores = [float(a[0]) for a in ans_scores]
+
+            doc_ids = [all_docids[0][ids_[0]] for ids_ in batch[-1]]
+            doc_scores = [float(all_doc_scores[0][ids_[0]]) for ids_ in batch[-1]]
+            sids = [ids_[1] for ids_ in batch[-1]]
+            all_np = []
+            all_na = []
+            for doc_id, start, end in zip(doc_ids, starts, ends):
+                n_p = [0 for _ in Tokenizer.FEAT]
+                for feat in p_ner[doc_id] + p_pos[doc_id]:
+                    n_p[Tokenizer.FEAT_DICT[feat]] += 1
+                n_a = [0 for _ in Tokenizer.FEAT]
+                for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
+                    n_a[Tokenizer.FEAT_DICT[feat]] += 1
+                all_np.append(n_p)
+                all_na.append(n_a)
+
+            all_n_p.extend(all_np)
+            all_n_a.extend(all_na)
+            all_p_scores.extend(doc_scores)
+
+            f_d = (doc_ids, sids)
+            f_n = (all_p_scores, all_n_p, all_n_a)
+            r_s = (starts, ends, ans_scores)
+            processed_count += len(ans_scores)
+            stop, batch_predictions = self.batch_predict_stop(f_d, f_n, r_s, s_tokens, f_nq,
+                                                              processed_count, self.stop_rank)
+            predictions.extend(batch_predictions)
+            if stop:
+                break
+            else:
+                continue
+        t8 = time.time()
+        logger.info('paragraphs predicted [time]: %.4f s' % (t8 - t7))
+        all_predictions.append(predictions[-1::-1])
+        logger.info('%d queries processed [time]: %.4f s' %
+                    (len(queries), time.time() - t3))
+
+        return all_predictions
+
+    def batch_predict_stop(self, f_d, f_n, r_s, s_tokens, f_nq, p_count=None, stop_rank=None):
+        doc_ids, sids = f_d
+        batch_size = len(doc_ids)
+        all_s_p, all_np, all_na = f_n
+        doc_scores, f_np, f_na = all_s_p[-batch_size:], all_np[-batch_size:], all_na[-batch_size:]
+        starts, ends, ans_scores = r_s
+        predictions_ = []
+        should_stop = False
+        for i, item in enumerate(zip(doc_ids, sids, doc_scores, starts, ends, ans_scores)):
+            doc_id, sid, doc_score, start, end, a_score = item
+            prediction = {
+                'doc_id': doc_id,
+                'start': int(start),
+                'end': int(end),
+                'span': s_tokens[sid].slice(start, end + 1).untokenize(),
+                'doc_score': doc_score,
+                'span_score': a_score,
+            }
+            predictions_.append(prediction)
+            if stop_rank:
+                if i + p_count + 1 >= stop_rank:
+                    should_stop = True
+                    break
+            else:
+                loc = - batch_size + i + 1 if - batch_size + i + 1 else None
+                sp = all_s_p[: loc]
+                np = all_np[: loc]
+                na = all_na[: loc]
+                f_sp = aggregate(sp)
+                f_np = aggregate(np)
+                f_na = aggregate(na)
+                et_input = torch.FloatTensor(f_sp + f_nq + f_np + f_na)
+                et_prob = self.et_model.predict(et_input, prob=True)
+                if et_prob > self.et_threshold:
+                    should_stop = True
+                    break
+        return should_stop, predictions_

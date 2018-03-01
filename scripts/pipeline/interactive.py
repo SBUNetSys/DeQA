@@ -15,7 +15,7 @@ import logging
 from termcolor import colored
 from drqa import pipeline
 from drqa.retriever import utils
-from drqa.retriever import GalagoRanker
+from drqa.retriever import LuceneRanker
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -34,14 +34,10 @@ parser.add_argument('--doc-db', type=str, default=None,
 parser.add_argument('--tokenizer', type=str, default=None,
                     help=("String option specifying tokenizer type to "
                           "use (e.g. 'corenlp')"))
-parser.add_argument('--candidate-file', type=str, default=None,
-                    help=("List of candidates to restrict predictions to, "
-                          "one candidate per line"))
 parser.add_argument('--no-cuda', action='store_true',
                     help="Use CPU only")
 parser.add_argument('--gpu', type=int, default=-1,
                     help="Specify GPU device id to use")
-parser.add_argument('--galago', action='store_true')
 parser.add_argument('--db_path', type=str, default=None,
                     help='Path to Document DB or index')
 
@@ -54,30 +50,11 @@ if args.cuda:
 else:
     logger.info('Running on CPU only.')
 
-if args.candidate_file:
-    logger.info('Loading candidates from %s' % args.candidate_file)
-    candidates = set()
-    with open(args.candidate_file) as f:
-        for line in f:
-            line = utils.normalize(line.strip()).lower()
-            candidates.add(line)
-    logger.info('Loaded %d candidates.' % len(candidates))
-else:
-    candidates = None
-
-if args.galago:
-    ranker_config_dict = {
-        'class': GalagoRanker,
-        'options': {'use_keyword': True, 'index_path': args.db_path}}
-else:
-    ranker_config_dict = {'options': {'tfidf_path': args.retriever_model}}
-
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
     cuda=args.cuda,
-    fixed_candidates=candidates,
     reader_model=args.reader_model,
-    ranker_config=ranker_config_dict,
+    ranker=LuceneRanker,
     tokenizer=args.tokenizer
 )
 
@@ -87,9 +64,9 @@ DrQA = pipeline.DrQA(
 # ------------------------------------------------------------------------------
 
 
-def process(question, candidates=None, top_n=1, n_docs=5):
-    predictions = DrQA.process(
-        question, candidates, top_n, n_docs, return_context=True
+def process(question, top_n=1, n_docs=5):
+    predictions = DrQA.process_single(
+        question, top_n, n_docs, return_context=True
     )
     table = prettytable.PrettyTable(
         ['Rank', 'Answer', 'Doc', 'Answer Score', 'Doc Score']

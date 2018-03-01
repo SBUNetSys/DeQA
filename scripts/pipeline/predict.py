@@ -6,13 +6,15 @@
 # LICENSE file in the root directory of this source tree.
 """Run predictions using the full DrQA retriever-reader pipeline."""
 
-import torch
-import os
-import time
-import json
 import argparse
+import json
 import logging
+import os
 import sys
+import time
+
+import torch
+
 from drqa import pipeline, retriever
 from drqa.retriever import utils
 
@@ -34,12 +36,6 @@ parser.add_argument('--retriever-model', type=str, default=None,
                     help="Path to Document Retriever model (tfidf)")
 parser.add_argument('--db_path', type=str, default=None,
                     help='Path to Document DB or index')
-parser.add_argument('--embedding-file', type=str, default=None,
-                    help=("Expand dictionary to use all pretrained "
-                          "embeddings in this file"))
-parser.add_argument('--candidate-file', type=str, default=None,
-                    help=("List of candidates to restrict predictions to, "
-                          "one candidate per line"))
 parser.add_argument('--n-docs', type=int, default=150,
                     help="Number of docs to retrieve per query")
 parser.add_argument('--top-n', type=int, default=150,
@@ -47,8 +43,7 @@ parser.add_argument('--top-n', type=int, default=150,
 parser.add_argument('--tokenizer', type=str, default='simple',
                     help=("String option specifying tokenizer type to use "
                           "(e.g. 'corenlp')"))
-parser.add_argument('--no-cuda', action='store_true',
-                    help="Use CPU only")
+parser.add_argument('--no-cuda', action='store_true', help="Use CPU only")
 parser.add_argument('--gpu', type=int, default=0,
                     help="Specify GPU device id to use")
 parser.add_argument('--parallel', action='store_true',
@@ -60,20 +55,21 @@ parser.add_argument('--batch-size', type=int, default=128,
 parser.add_argument('--predict-batch-size', type=int, default=1,
                     help='Question batching size')
 parser.add_argument('--ranker', type=str, default='lucene')
-parser.add_argument('--use_keyword', action='store_true')
 parser.add_argument('--features_dir', type=str, default=None)
-parser.add_argument("-v", "--verbose", help="log more debug info",
-                    action="store_true")
+parser.add_argument('--stop_rank', type=int, default=None,
+                    help='how many passages to process')
+parser.add_argument("-v", "--verbose", help="log more debug info", action="store_true")
 
 args = parser.parse_args()
 if args.verbose:
     logger.setLevel(logging.DEBUG)
 
 t0 = time.time()
-logfile = logging.FileHandler('/tmp/%s.log' % t0, 'w')
+log_filename = ('_'.join(sys.argv) + time.strftime("%Y%m%d-%H%M%S")).replace('/', '_')
+logfile = logging.FileHandler('/tmp/%s.log' % log_filename, 'w')
 logfile.setFormatter(fmt)
 logger.addHandler(logfile)
-logger.info('COMMAND: \n%s' % ' '.join(sys.argv))
+logger.info('COMMAND: python %s' % ' '.join(sys.argv))
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 if args.cuda:
@@ -81,18 +77,6 @@ if args.cuda:
     logger.info('CUDA enabled (GPU %d)' % args.gpu)
 else:
     logger.info('Running on CPU only.')
-
-
-if args.candidate_file:
-    logger.info('Loading candidates from %s' % args.candidate_file)
-    candidates = set()
-    with open(args.candidate_file) as f:
-        for line in f:
-            line = utils.normalize(line.strip()).lower()
-            candidates.add(line)
-    logger.info('Loaded %d candidates.' % len(candidates))
-else:
-    candidates = None
 
 if args.ranker.lower().startswith('g'):
     ranker = retriever.get_class('galago')(use_keyword=args.use_keyword, index_path=args.db_path)
@@ -106,7 +90,6 @@ else:
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
     reader_model=args.reader_model,
-    fixed_candidates=candidates,
     embedding_file=args.embedding_file,
     tokenizer=args.tokenizer,
     batch_size=args.batch_size,
@@ -114,7 +97,8 @@ DrQA = pipeline.DrQA(
     data_parallel=args.parallel,
     ranker=ranker,
     num_workers=args.num_workers,
-    features_dir=args.features_dir
+    features_dir=args.features_dir,
+    stop_rank=args.stop_rank
 )
 
 # ------------------------------------------------------------------------------
@@ -141,11 +125,7 @@ with open(outfile, 'w') as f:
         batch_info = '-' * 5 + ' Batch %d/%d ' % (i + 1, len(batches)) + '-' * 5 + ' '
         start_query = queries[i]
         logger.info(batch_info + start_query)
-        predictions = DrQA.process_batch(
-            batch,
-            n_docs=args.n_docs,
-            top_n=args.top_n,
-        )
+        predictions = DrQA.process(batch, n_docs=args.n_docs, top_n=args.top_n)
         for p in predictions:
             f.write(json.dumps(p) + '\n')
 
