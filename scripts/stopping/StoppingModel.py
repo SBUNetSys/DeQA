@@ -77,7 +77,7 @@ class EarlyStoppingModel(object):
 
     def predict(self, inputs, prob=False):
         self.network.eval()
-        if self.args.cuda and torch.cuda.is_available():
+        if next(self.network.parameters()).is_cuda:
             inputs_var = Variable(inputs.cuda(async=True))
         else:
             inputs_var = Variable(inputs)
@@ -184,7 +184,7 @@ class RecordDataset(Dataset):
         else:
             print('warning: %s not exist!' % record_)
         sp = torch.FloatTensor(record_data['sp'])  # 4x1
-        # sa = torch.FloatTensor(record_data['sa'])  # 4x1
+        # sa = torch.FloatTensor(record_data['sa'])  # 2x1
 
         np = torch.FloatTensor(record_data['np'])  # 4x58
         na = torch.FloatTensor(record_data['na'])  # 4x58
@@ -195,6 +195,7 @@ class RecordDataset(Dataset):
         # ha = torch.FloatTensor(record_data['ha'])  # 4x768
 
         # ft = torch.cat([sp, sa, nq, np, na, hq, hp, ha])
+        # ft = torch.cat([sp, sa, nq, np, na])
         ft = torch.cat([sp, nq, np, na])
 
         if has_label:

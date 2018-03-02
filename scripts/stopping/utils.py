@@ -240,9 +240,16 @@ def aggregate(data_):
     return features
 
 
-def get_rank(prediction_, answer_):
+def aggregate_ans(data_):
+
+    import numpy as np
+    features = np.std(data_, 0).flatten().tolist()
+    return features
+
+
+def get_rank(prediction_, answer_, match_fn):
     for doc_rank_, entry in enumerate(prediction_):
-        exact_match = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer_)
-        if exact_match:
+        match = metric_max_over_ground_truths(match_fn, normalize(entry['span']), answer_)
+        if match:
             return doc_rank_ + 1
-    return 1000
+    return 151

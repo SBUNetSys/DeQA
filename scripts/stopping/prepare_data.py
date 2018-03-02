@@ -4,8 +4,8 @@ import argparse
 import os
 from collections import OrderedDict
 from utils import normalize
-from utils import exact_match_score, metric_max_over_ground_truths
-from utils import slugify, aggregate
+from utils import exact_match_score, regex_match_score, get_rank
+from utils import slugify, aggregate, aggregate_ans
 from utils import Tokenizer
 from multiprocessing import Pool as ProcessPool
 
@@ -17,7 +17,7 @@ import time
 ENCODING = "utf-8"
 
 
-def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, feature_dir_, record_dir_):
+def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_dir_, match_fn):
     missing_count_ = 0
     total_count_ = 0
     stop_count_ = 0
@@ -38,31 +38,23 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, feature_dir
         sys.stdout.flush()
         missing_count_ += 1
         return missing_count_, total_count_, stop_count_
-    # q_h_path = os.path.join(DEFAULTS['features'], '%s.npz' % q_id)
-    #
-    # if os.path.exists(q_h_path):
-    #     q_h_data = np.load(q_h_path)
-    #     q_h = q_h_data['q_hidden']
-    # else:
-    #     print('question hidden file %s not exist!' % q_h_path)
-    #     sys.stdout.flush()
-    #     return missing_count_, total_count_, stop_count_
+
     answer = [normalize(a) for a in data['answer']]
     prediction = json.loads(prediction_line_)
     ranked_prediction = sorted(prediction, key=lambda k: k['doc_score'])
-    found_correct = False
+    correct_rank = get_rank(prediction, answer, match_fn)
+    if correct_rank > 150:
+        return missing_count_, total_count_, stop_count_
     all_n_p = []
     all_n_a = []
-    # all_p_hidden = []
-    # all_a_hidden = []
     all_p_scores = []
-    # all_a_scores = []
+    all_a_scores = []
     for i, entry in enumerate(ranked_prediction):
         doc_id = entry['doc_id']
         start = int(entry['start'])
         end = int(entry['end'])
         doc_score = entry['doc_score']
-        # ans_score = entry['span_score']
+        ans_score = entry['span_score']
 
         p_pos = dict()
         p_ner = dict()
@@ -78,55 +70,33 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, feature_dir
         for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
             n_a[Tokenizer.FEAT_DICT[feat]] += 1
 
-        # p_h_path = os.path.join(DEFAULTS['features'], '%s_%s.npz' % (q_id, doc_id))
-        # if os.path.exists(p_h_path):
-        #     p_h_data = np.load(p_h_path)
-        #     # p_h = p_h_data['doc_hidden']
-        #     a_h = p_h_data['ans_hidden']
-        # else:
-        #     print('paragraph hidden file %s not exist!' % p_h_path)
-        #     sys.stdout.flush()
-        #     missing_count_ += 1
-        #     continue
         all_n_p.append(n_p)
         all_n_a.append(n_a)
-        # all_p_hidden.append(p_h)
-        # all_a_hidden.append(a_h)
+
         all_p_scores.append(doc_score)
-        # all_a_scores.append(ans_score)
+        all_a_scores.append(ans_score)
 
         f_np = aggregate(all_n_p)
         f_na = aggregate(all_n_a)
         f_sp = aggregate(all_p_scores)
-        # f_sa = aggregate(all_a_scores)
-        # f_hp = aggregate(all_p_hidden)
-        # f_ha = aggregate(all_a_hidden)
+        f_sa = aggregate_ans(all_a_scores)
 
         record = OrderedDict()
-        # record['q'] = question
-        # record['a'] = normalize(entry['span'])
 
         # sp, nq, np, na, ha
         record['sp'] = f_sp
         record['nq'] = list(map(float, n_q))
         record['np'] = f_np
         record['na'] = f_na
-        # record['ha'] = f_ha
-        # record['sa'] = f_sa
-        # record['hp'] = f_hp
-        # record['hq'] = list(map(float, q_h))
+        record['sa'] = f_sa
 
-        if not found_correct:
-            found_correct = metric_max_over_ground_truths(exact_match_score, normalize(entry['span']), answer)
-
-        if found_correct:
-            if i % pos_gap_ == 0:
-                record['stop'] = 1
-                stop_count_ += 1
-                write_record = True
-            else:
-                write_record = False
+        if i + 1 == correct_rank:
+            record['stop'] = 1
+            stop_count_ += 1
+            write_record = True
+            should_return = True
         else:
+            should_return = False
             if i % neg_gap_ == 0:
                 record['stop'] = 0
                 write_record = True
@@ -137,6 +107,8 @@ def process_record(data_line_, prediction_line_, pos_gap_, neg_gap_, feature_dir
             with open(record_path, 'wb') as f:
                 pk.dump(record, f)
             total_count_ += 1
+        if should_return:
+            return missing_count_, total_count_, stop_count_
     return missing_count_, total_count_, stop_count_
 
 
@@ -149,15 +121,16 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--prediction_file',
                         help='prediction file, e.g. CuratedTrec-test-lstm.preds.txt')
     parser.add_argument('-a', '--answer_file', help='data set with labels, e.g. CuratedTrec-test.txt')
-    parser.add_argument('-m', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
-    parser.add_argument('-ps', '--positive_scale', type=int, default=3, help='scale factor for positive samples')
+    parser.add_argument('-nm', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
     parser.add_argument('-ns', '--negative_scale', type=int, default=10, help='scale factor for negative samples')
     parser.add_argument('-r', '--record_dir', default=None, help='dir to save generated records data set')
     parser.add_argument('-f', '--feature_dir', default=None,
                         help='dir that contains json features files, unzip squad.tgz or trec.tgz to get that dir')
+    parser.add_argument('-rg', '--regex', action='store_true', help='default to use exact match')
 
     args = parser.parse_args()
 
+    match_func = regex_match_score if args.regex else exact_match_score
     missing_count = 0
     total_count = 0
     stop_count = 0
@@ -175,8 +148,8 @@ if __name__ == '__main__':
     if args.no_multiprocess:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            missing, total, stop = process_record(data_line, prediction_line,
-                                                  args.positive_scale, args.negative_scale, feature_dir, record_dir)
+            missing, total, stop = process_record(data_line, prediction_line, args.negative_scale,
+                                                  feature_dir, record_dir, match_func)
             missing_count += missing
             stop_count += stop
             total_count += total
@@ -188,7 +161,8 @@ if __name__ == '__main__':
         async_pool = ProcessPool()
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
-            param = (data_line, prediction_line, args.positive_scale, args.negative_scale, feature_dir, record_dir)
+            param = (data_line, prediction_line, args.negative_scale,
+                     feature_dir, record_dir, match_func)
             handle = async_pool.apply_async(process_record, param)
             result_handles.append(handle)
         for result in result_handles:
