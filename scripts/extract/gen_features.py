@@ -137,8 +137,8 @@ def process_batch(retriever, questions, save_dir, n_docs=5, processes=None, num_
                     feat_file = os.path.join(save_dir, '%s.json' % did)
                     if not os.path.exists(feat_file):
                         para_length = len(para_text)
-                        counter = Counter(para_text)
-                        tf = [round(counter[w] * 1.0 / para_length, 6) for w in para_text]
+                        counter = Counter([w.lower() for w in para_text])
+                        tf = [round(counter[w.lower()] * 1.0 / para_length, 6) for w in para_text]
                         record = {
                             'pos': s_tokens[sidx].pos(),
                             'ner': s_tokens[sidx].entities(),
