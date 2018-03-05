@@ -41,7 +41,7 @@ def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_
 
     answer = [normalize(a) for a in data['answer']]
     prediction = json.loads(prediction_line_)
-    ranked_prediction = sorted(prediction, key=lambda k: k['doc_score'])
+    ranked_prediction = sorted(prediction, key=lambda k: -k['doc_score'])
     correct_rank = get_rank(prediction, answer, match_fn)
     if correct_rank > 150:
         return missing_count_, total_count_, stop_count_
