@@ -298,7 +298,7 @@ class DrQA(object):
             for i in range(batch_size):
                 # We take the top prediction per split.
                 if len(score[i]) > 0:
-                    item = (score[i][0], ex_ids[i], s[i][0], e[i][0], entropy[i][0], prob[i][0])
+                    item = (score[i][0], ex_ids[i], s[i][0], e[i][0], entropy[i], prob[i])
                     queue = queues[ex_ids[i][0]]
                     if len(queue) < top_n:
                         heapq.heappush(queue, item)
@@ -314,8 +314,8 @@ class DrQA(object):
                 score, (qidx, rel_didx, sidx), s, e, entropy, prob = heapq.heappop(queue)
                 prediction = {
                     'doc_id': all_docids[qidx][rel_didx],
-                    'start': str(s),
-                    'end': str(e),
+                    'start': int(s),
+                    'end': int(e),
                     'span': s_tokens[sidx].slice(s, e + 1).untokenize(),
                     'doc_score': float(all_doc_scores[qidx][rel_didx]),
                     'span_score': float(score),
