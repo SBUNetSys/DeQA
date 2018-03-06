@@ -294,7 +294,7 @@ class DrQA(object):
         # top scored answers for each question in the batch.
         queues = [[] for _ in range(len(queries))]
         for result, ex_ids, batch_size in result_handles:
-            s, e, score = result.get()
+            s, e, score, entropy, prob = result.get()
             for i in range(batch_size):
                 # We take the top prediction per split.
                 if len(score[i]) > 0:
