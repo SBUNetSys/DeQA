@@ -15,6 +15,9 @@ from tensorflow.python.ops import nn_ops
 
 class MyLSTMCell(BasicLSTMCell):
 
+    def compute_output_shape(self, input_shape):
+        super(MyLSTMCell, self).compute_output_shape(input_shape)
+
     def __init__(self, num_units, forget_bias=0,
                  state_is_tuple=True, activation=None,
                  reuse=None, name=None, weight_initializer=None, bias_initializer=None):
