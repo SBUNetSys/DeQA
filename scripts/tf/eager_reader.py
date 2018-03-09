@@ -85,10 +85,13 @@ def length(sequence):
     return pad_len
 
 
-def stack_bi_rnn(input_data, mask, hidden_size, num_layers, weights, scope):
+def stack_bi_rnn(input_data, hidden_size, num_layers, weights, scope, mask=None):
     rnn_scope = 'q_rnn' if scope.startswith('q') else 'p_rnn'
     with tf.variable_scope(rnn_scope):
-        seq_len = length(mask)
+        if mask is not None:
+            seq_len = length(mask)
+        else:
+            seq_len = tf.ones(tf.shape(input_data)[0], dtype=tf.int32) * tf.shape(input_data)[1]
         outputs = []
         last_output = input_data
         for k in range(num_layers):
@@ -250,7 +253,7 @@ class RnnReader(object):
             weighted_average = tf.matmul(alpha, y)
         return weighted_average
 
-    def linear_seq_attn(self, x, x_mask):
+    def linear_seq_attn(self, x):
         x_weight = tf.get_variable('weights', initializer=self.self_attn_weights)
         x_bias = tf.get_variable('bias', initializer=self.self_attn_bias)
 
@@ -259,8 +262,7 @@ class RnnReader(object):
             scores = tf.reshape(tf.matmul(x_flat, x_weight, transpose_b=True) + x_bias, [-1, tf.shape(x)[1]])
 
         with tf.variable_scope('score'):
-            x_mask = tf.cast(tf.equal(x_mask, 0), tf.float32)
-            scores = tf.multiply(tf.exp(scores), x_mask)
+            scores = tf.exp(scores)
             x_sum = tf.expand_dims(tf.reduce_sum(scores, axis=1), axis=1)
 
         with tf.variable_scope('weighted'):
@@ -269,7 +271,7 @@ class RnnReader(object):
 
         return out
 
-    def network(self, x1_emb, x1_f, x1_mask, x2_emb, x2_mask):
+    def network(self, x1_emb, x1_f, x1_mask, x2_emb):
         with tf.variable_scope('q_seq_attn'):
             x2_weighted_emb = self.seq_attn_match(x1_emb, x2_emb, self.emb_shape[1])
 
@@ -280,19 +282,23 @@ class RnnReader(object):
         # self.np_rnn(x2_emb.numpy())
         q_rnn_scope = 'question_rnn'
         q_rnn_weights = {k: v for k, v in self.weights.items() if k.startswith(q_rnn_scope)}
-        question_hidden = stack_bi_rnn(input_data=x2_emb, mask=x2_mask,
+        question_hidden = stack_bi_rnn(input_data=x2_emb,
                                        hidden_size=self.hidden_size,
                                        num_layers=self.question_layers,
-                                       weights=q_rnn_weights, scope=q_rnn_scope)
-        doc_rnn_scope = 'doc_rnn'
-        doc_rnn_weights = {k: v for k, v in self.weights.items() if k.startswith(doc_rnn_scope)}
-        doc_hidden = stack_bi_rnn(input_data=doc_rnn_input, mask=x1_mask,
-                                  hidden_size=self.hidden_size,
-                                  num_layers=self.doc_layers,
-                                  weights=doc_rnn_weights, scope=doc_rnn_scope)
+                                       weights=q_rnn_weights,
+                                       scope=q_rnn_scope)
 
         with tf.variable_scope('q_self_attn'):
-            q_weighted_hidden = self.linear_seq_attn(question_hidden, x2_mask)
+            q_weighted_hidden = self.linear_seq_attn(question_hidden)
+
+        doc_rnn_scope = 'doc_rnn'
+        doc_rnn_weights = {k: v for k, v in self.weights.items() if k.startswith(doc_rnn_scope)}
+        doc_hidden = stack_bi_rnn(input_data=doc_rnn_input,
+                                  hidden_size=self.hidden_size,
+                                  num_layers=self.doc_layers,
+                                  weights=doc_rnn_weights,
+                                  scope=doc_rnn_scope,
+                                  mask=x1_mask)
 
         with tf.variable_scope('start'):
             start_scores = bi_linear_seq_attn(self.start_attn_weights.transpose(), self.start_attn_bias,
@@ -328,8 +334,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     ex_input = np.load(args.test_ex)
-    np.greater_equal.outer(np.arange(3), np.arange(-2, 5 - 2))
-    ex_inputs = [ex_input[k] for k in ex_input.keys()]
+    ex_inputs = [ex_input[k] for k in ex_input.keys()[:-1]]
     emb = np.load(args.embedding_file)['emb']
     ex_inputs[0] = np.array([emb[i] for i in ex_inputs[0]])
     ex_inputs[3] = np.array([emb[i] for i in ex_inputs[3]])
