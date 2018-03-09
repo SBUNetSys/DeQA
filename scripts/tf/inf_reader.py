@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     ex_input = np.load(args.test_ex)
-    ex_inputs = [ex_input[k] for k in ex_input.keys()]
+    ex_inputs = [ex_input[k] for k in ex_input.keys()[:-1]]
     emb = np.load(args.embedding_file)['emb']
     ex_inputs[0] = np.array([emb[i] for i in ex_inputs[0]])
     ex_inputs[3] = np.array([emb[i] for i in ex_inputs[3]])
@@ -28,12 +28,13 @@ if __name__ == '__main__':
         tf.import_graph_def(graph_def, input_map=None, return_elements=None,
                             name='', op_dict=None, producer_op_list=None)
     session = tf.Session(graph=graph)
-    # weight = session.run(graph.get_operation_by_name('doc_rnn/layer_0/bi_rnn/fw/lstm/kernel').outputs[0])
+    # weight = session.run(graph.get_operation_by_name('p_rnn/layer_0/bi_rnn/fw/lstm/kernel').outputs[0])
     # print(weight)
     begin_time = time.time()
+    input_names = ['para/emb', 'para/feature', 'para/mask', 'q_emb']
 
-    placeholders = [graph.get_operation_by_name('input_{}'.format(i + 1)).outputs[0]
-                    for i in range(len(ex_inputs))]
+    placeholders = [graph.get_operation_by_name(name).outputs[0] for name in input_names]
+
     output = graph.get_operation_by_name('answer/scores').outputs[0]
 
     scores = session.run(output, feed_dict={k: v for k, v in zip(placeholders, ex_inputs)})
