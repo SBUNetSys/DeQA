@@ -32,8 +32,8 @@ if __name__ == '__main__':
 
     placeholders = [graph.get_operation_by_name('input_{}'.format(i + 1)).outputs[0]
                     for i in range(len(ex_inputs))]
-    output = graph.get_operation_by_name("answer").outputs[0]
+    output = graph.get_operation_by_name("scores").outputs[0]
 
-    answers = session.run(output, feed_dict={k: v for k, v in zip(placeholders, ex_inputs)})
-    print(answers)
+    scores = session.run(output, feed_dict={k: v for k, v in zip(placeholders, ex_inputs)})
+    print(scores)
     end_time = time.time()

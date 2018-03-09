@@ -104,7 +104,7 @@ def stack_bi_rnn(input_data, mask, hidden_size, num_layers, weights, scope):
         bw_bias_hidden = weights['{}.rnns.{}.bias_hh_l0_reverse'.format(scope, str(k))]
         bw_bias = np.add(bw_bias_input, bw_bias_hidden)
 
-        with tf.variable_scope("{}/layer_{}".format(scope, str(k))):
+        with tf.variable_scope("{}_rnn/layer_{}".format('q' if scope.startswith('q') else 'p', str(k))):
             fw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
                                  weight_initializer=fw_weights, bias_initializer=fw_bias)
             bw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
@@ -184,8 +184,8 @@ class RnnReader(object):
         self.sess = tf.Session()
 
     def seq_attn_match(self, x, y, input_size):
-        seq_weights = tf.get_variable('qemb_match_weights', initializer=self.qemb_match_weights)
-        b = tf.get_variable('qemb_match_bias', initializer=self.qemb_match_bias)
+        seq_weights = tf.get_variable('q_emb_match_weights', initializer=self.qemb_match_weights)
+        b = tf.get_variable('q_emb_match_bias', initializer=self.qemb_match_bias)
         # Project vectors
         x_re = tf.reshape(x, [-1, input_size])
         x_pj = tf.matmul(x_re, seq_weights, transpose_b=True) + b
@@ -245,14 +245,14 @@ class RnnReader(object):
 
         q_weighted_hidden = self.linear_seq_attn(question_hidden, x2_mask)
 
-        with tf.variable_scope("span_start"):
+        with tf.variable_scope("start"):
             start_scores = bi_linear_seq_attn(self.start_attn_weights.transpose(), self.start_attn_bias,
                                               doc_hidden, q_weighted_hidden, x1_mask)
 
-        with tf.variable_scope("span_end"):
+        with tf.variable_scope("end"):
             end_scores = bi_linear_seq_attn(self.end_attn_weights.transpose(), self.end_attn_bias,
                                             doc_hidden, q_weighted_hidden, x1_mask)
-        final_answer = tf.concat([start_scores, end_scores], 1, name="answer")
+        final_answer = tf.concat([start_scores, end_scores], 1, name="scores")
 
         # batches = start_scores.get_shape().as_list()[0]
         # idx = tf.constant(0)
@@ -310,10 +310,10 @@ if __name__ == '__main__':
                     for i, k in enumerate(ex_inputs)]
     final_answers = reader.network(*placeholders)
     sess = reader.sess
-    # for var in tf.global_variables():
-    #     sess.run(var.initializer)
-    #     print(sess.run(var))
-    #     print(var)
+    for var in tf.global_variables():
+        # sess.run(var.initializer)
+        # print(sess.run(var))
+        print(var.name[:-2], var.shape)
     sess.run(tf.global_variables_initializer())
     # print(sess.run(tf.report_uninitialized_variables()))
 
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     output_graph_def = graph_util.convert_variables_to_constants(
         sess,  # The session is used to retrieve the weights
         graph_def,  # The graph_def is used to retrieve the nodes
-        output_node_names=['answer']  # The output node names are used to select the useful nodes
+        output_node_names=['scores']  # The output node names are used to select the useful nodes
     )
     with tf.gfile.GFile('data/tf_reader.pb', "wb") as gf:
         gf.write(output_graph_def.SerializeToString())
