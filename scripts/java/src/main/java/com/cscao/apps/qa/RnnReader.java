@@ -32,7 +32,7 @@ public class RnnReader {
         config.set(Configuration.CACHE_ENABLED, "true");
         config.set(Configuration.MMAP_SEGMENT_SIZE, "104857600"); // 1024^2*100 = 100 MB
         config.set(Configuration.CACHE_BYTES, "104857600");
-        mEmbReader = PalDB.createReader(new File("emb.pdb"), config);
+        mEmbReader = PalDB.createReader(new File(GenEmbDB.EMB_DB_PATH), config);
     }
 
     private static final int VECTOR_DIM = 300;
@@ -225,14 +225,12 @@ public class RnnReader {
                 ByteBuffer.wrap(mask[0]));
         Tensor<Float> input4 = Tensor.create(new long[]{batch, data[2].length / batch / vectorDim, vectorDim},
                 FloatBuffer.wrap(data[2]));
-        Tensor<UInt8> input5 = Tensor.create(UInt8.class, new long[]{batch, mask[1].length / batch},
-                ByteBuffer.wrap(mask[1]));
-        Tensor<Float> result = runner.feed("input_1", input1)
-                .feed("input_2", input2)
-                .feed("input_3", input3)
-                .feed("input_4", input4)
-                .feed("input_5", input5)
-                .fetch("answer").run().get(0).expect(Float.class);
+
+        Tensor<Float> result = runner.feed("para/emb", input1)
+                .feed("para/feature", input2)
+                .feed("para/mask", input3)
+                .feed("q_emb", input4)
+                .fetch("answer/scores").run().get(0).expect(Float.class);
 
         final long[] resultShape = result.shape();
         System.out.println(Arrays.toString(resultShape));

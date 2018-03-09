@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class GenEmbDB {
-
+    public static final String EMB_DB_PATH = "out/emb.pdb";
     public void writeTokenKeyEmbDB() throws IOException {
         String exFile = getClass().getClassLoader().getResource("emb.npz").getPath();
         Path npFile = Paths.get(exFile);
@@ -30,7 +30,7 @@ public class GenEmbDB {
         assert embShape[1] == 300;
         int embRecords = embShape[0];
         int vectorDim = embShape[1];
-        StoreWriter writer = PalDB.createWriter(new File("emb.pdb"));
+        StoreWriter writer = PalDB.createWriter(new File(EMB_DB_PATH));
         float[] vector = new float[vectorDim];
         String ind2tokFile = getClass().getClassLoader().getResource("ind2tok.txt").getPath();
         Stream<String> ind2tokStream = Files.lines(Paths.get(ind2tokFile));
@@ -49,7 +49,7 @@ public class GenEmbDB {
     }
 
     public void readEmbDb() {
-        StoreReader reader = PalDB.createReader(new File("emb.pdb"));
+        StoreReader reader = PalDB.createReader(new File(EMB_DB_PATH));
         float[] vector = reader.get("How");
         System.out.println(Arrays.toString(vector));
     }
