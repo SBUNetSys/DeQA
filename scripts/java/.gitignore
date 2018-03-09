@@ -1,0 +1,12 @@
+*.pyc
+*.DS_Store
+*~
+data/
+.idea
+src/main/resources/emb.npz
+src/main/resources/tf_reader.pb
+src/main/resources/tf_reader.pb.txt
+src/main/resources/emb.pdb
+out/
+.gradle/
+build/
