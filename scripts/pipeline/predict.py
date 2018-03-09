@@ -39,7 +39,7 @@ parser.add_argument('--n_docs', type=int, default=150,
                     help="Number of docs to retrieve per query")
 parser.add_argument('--top_n', type=int, default=150,
                     help="Number of predictions to make per query")
-parser.add_argument('--tokenizer', type=str, default='simple',
+parser.add_argument('--tokenizer', type=str, default='corenlp',
                     help=("String option specifying tokenizer type to use "
                           "(e.g. 'corenlp')"))
 parser.add_argument('--no-cuda', action='store_true', help="Use CPU only")
@@ -128,6 +128,7 @@ with open(outfile, 'w') as f:
         logger.info(batch_info + start_query)
         predictions = DrQA.process(batch, n_docs=args.n_docs, top_n=args.top_n)
         for p in predictions:
+            p = sorted(p, key=lambda k: k['doc_score'], reverse=True)
             f.write(json.dumps(p) + '\n')
 
 logger.info('Total time: %.4f' % (time.time() - t0))

@@ -276,6 +276,11 @@ class DrQA(object):
                             'ner': s_tokens[sidx].entities(),
                             'doc_score': float(all_doc_scores[qidx][rel_didx])
                         })
+                        # r = {'w': para_text}
+                        # f = open('/tmp/data.json', 'w')
+                        # f.write(json.dumps(r))
+                        # f.close()
+                        # exit(0)
                         para_lens.append(len(s_tokens[sidx].words()))
             logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
