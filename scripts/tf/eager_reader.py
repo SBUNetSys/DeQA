@@ -8,6 +8,7 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 
 tf.contrib.eager.enable_eager_execution()
+np.set_printoptions(suppress=True)
 
 
 class MyLSTMCell(BasicLSTMCell):
@@ -355,7 +356,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--weights_file', type=str, default='data/rnn_reader.npz')
     parser.add_argument('-e', '--embedding_file', type=str, default='data/emb.npz')
     parser.add_argument('-a', '--args', type=str, default='data/args.npy')
-    parser.add_argument('-t', '--test_ex', type=str, default='data/ex2.npz')
+    parser.add_argument('-t', '--test_ex', type=str, default='data/ex.npz')
 
     args = parser.parse_args()
     ex_input = np.load(args.test_ex)
