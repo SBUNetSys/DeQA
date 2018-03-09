@@ -4,6 +4,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
+np.set_printoptions(suppress=True)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--frozen_model', type=str, default='data/tf_reader.pb')
@@ -19,12 +21,12 @@ if __name__ == '__main__':
 
     frozen_model = args.frozen_model
     # reader.network(*(ex_input[k] for k in ex_input.keys()))
-    with tf.gfile.GFile(frozen_model, "rb") as f:
+    with tf.gfile.GFile(frozen_model, 'rb') as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
     with tf.Graph().as_default() as graph:
         tf.import_graph_def(graph_def, input_map=None, return_elements=None,
-                            name="", op_dict=None, producer_op_list=None)
+                            name='', op_dict=None, producer_op_list=None)
     session = tf.Session(graph=graph)
     # weight = session.run(graph.get_operation_by_name('doc_rnn/layer_0/bi_rnn/fw/lstm/kernel').outputs[0])
     # print(weight)
@@ -32,7 +34,7 @@ if __name__ == '__main__':
 
     placeholders = [graph.get_operation_by_name('input_{}'.format(i + 1)).outputs[0]
                     for i in range(len(ex_inputs))]
-    output = graph.get_operation_by_name("scores").outputs[0]
+    output = graph.get_operation_by_name('answer/scores').outputs[0]
 
     scores = session.run(output, feed_dict={k: v for k, v in zip(placeholders, ex_inputs)})
     print(scores)

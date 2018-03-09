@@ -22,14 +22,17 @@ class MyLSTMCell(BasicLSTMCell):
         self._kernel = None
         self._bias = None
 
+    def compute_output_shape(self, input_shape):
+        super(MyLSTMCell, self).compute_output_shape(input_shape)
+
     def build(self, inputs_shape):
         if inputs_shape[1].value is None:
-            raise ValueError("Expected inputs.shape[-1] to be known, saw shape: %s"
+            raise ValueError('Expected inputs.shape[-1] to be known, saw shape: %s'
                              % inputs_shape)
-        self._kernel = self.add_variable("kernel",
+        self._kernel = self.add_variable('kernel',
                                          shape=None,
                                          initializer=self.weight_initializer)
-        self._bias = self.add_variable("bias",
+        self._bias = self.add_variable('bias',
                                        shape=None,
                                        initializer=self.bias_initializer)
         self.built = True
@@ -75,60 +78,67 @@ class MyLSTMCell(BasicLSTMCell):
 
 
 def length(sequence):
-    eq = tf.equal(sequence, 0)
-    length_ = tf.cast(eq, tf.int32)
-    pad_len = tf.reduce_sum(length_, 1)
+    with tf.variable_scope('pad'):
+        eq = tf.equal(sequence, 0)
+        length_ = tf.cast(eq, tf.int32)
+        pad_len = tf.reduce_sum(length_, 1)
     return pad_len
 
 
 def stack_bi_rnn(input_data, mask, hidden_size, num_layers, weights, scope):
-    seq_len = length(mask)
-    outputs = []
-    last_output = input_data
-    for k in range(num_layers):
-        fw_weights_input = weights['{}.rnns.{}.weight_ih_l0'.format(scope, str(k))]
-        fw_weights_hidden = weights['{}.rnns.{}.weight_hh_l0'.format(scope, str(k))]
-        fw_weights = np.concatenate((fw_weights_input, fw_weights_hidden), axis=1).transpose()
+    rnn_scope = 'q_rnn' if scope.startswith('q') else 'p_rnn'
+    with tf.variable_scope(rnn_scope):
+        seq_len = length(mask)
+        outputs = []
+        last_output = input_data
+        for k in range(num_layers):
+            fw_weights_input = weights['{}.rnns.{}.weight_ih_l0'.format(scope, str(k))]
+            fw_weights_hidden = weights['{}.rnns.{}.weight_hh_l0'.format(scope, str(k))]
+            fw_weights = np.concatenate((fw_weights_input, fw_weights_hidden), axis=1).transpose()
 
-        fw_bias_input = weights['{}.rnns.{}.bias_ih_l0'.format(scope, str(k))]
-        fw_bias_hidden = weights['{}.rnns.{}.bias_hh_l0'.format(scope, str(k))]
-        fw_bias = np.add(fw_bias_input, fw_bias_hidden)
+            fw_bias_input = weights['{}.rnns.{}.bias_ih_l0'.format(scope, str(k))]
+            fw_bias_hidden = weights['{}.rnns.{}.bias_hh_l0'.format(scope, str(k))]
+            fw_bias = np.add(fw_bias_input, fw_bias_hidden)
 
-        bw_weights_input = weights['{}.rnns.{}.weight_ih_l0_reverse'.format(scope, str(k))]
-        bw_weights_hidden = weights['{}.rnns.{}.weight_hh_l0_reverse'.format(scope, str(k))]
-        bw_weights = np.concatenate((bw_weights_input, bw_weights_hidden), axis=1).transpose()
+            bw_weights_input = weights['{}.rnns.{}.weight_ih_l0_reverse'.format(scope, str(k))]
+            bw_weights_hidden = weights['{}.rnns.{}.weight_hh_l0_reverse'.format(scope, str(k))]
+            bw_weights = np.concatenate((bw_weights_input, bw_weights_hidden), axis=1).transpose()
 
-        bw_bias_input = weights['{}.rnns.{}.bias_ih_l0_reverse'.format(scope, str(k))]
-        bw_bias_hidden = weights['{}.rnns.{}.bias_hh_l0_reverse'.format(scope, str(k))]
-        bw_bias = np.add(bw_bias_input, bw_bias_hidden)
+            bw_bias_input = weights['{}.rnns.{}.bias_ih_l0_reverse'.format(scope, str(k))]
+            bw_bias_hidden = weights['{}.rnns.{}.bias_hh_l0_reverse'.format(scope, str(k))]
+            bw_bias = np.add(bw_bias_input, bw_bias_hidden)
 
-        with tf.variable_scope("{}/layer_{}".format(scope, str(k))):
-            fw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
-                                 weight_initializer=fw_weights, bias_initializer=fw_bias)
-            bw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
-                                 weight_initializer=bw_weights, bias_initializer=bw_bias)
+            with tf.variable_scope('layer_{}'.format(str(k))):
+                fw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
+                                     weight_initializer=fw_weights, bias_initializer=fw_bias)
+                bw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
+                                     weight_initializer=bw_weights, bias_initializer=bw_bias)
 
-            output, _ = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell, last_output,
-                                                        dtype=tf.float32,
-                                                        sequence_length=seq_len,
-                                                        scope='bi_rnn')
-            last_output = tf.concat(output, 2)
-        outputs.append(last_output)
-    return tf.concat(outputs, axis=2)
+                output, _ = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell, last_output,
+                                                            dtype=tf.float32,
+                                                            sequence_length=seq_len,
+                                                            scope='bi_rnn')
+                last_output = tf.concat(output, 2)
+            outputs.append(last_output)
+        out = tf.concat(outputs, axis=2)
+    return out
 
 
 def bi_linear_seq_attn(bi_w, bi_bias, x, y, x_mask):
-    w = tf.get_variable('bi_linear_weights', initializer=bi_w)
-    b = tf.get_variable('bi_linear_bias', initializer=bi_bias)
-    wy = tf.add(tf.matmul(y, w), b)
+    with tf.variable_scope('bi_attn'):
+        w = tf.get_variable('weights', initializer=bi_w)
+        b = tf.get_variable('bias', initializer=bi_bias)
 
-    xwy = tf.matmul(x, tf.expand_dims(wy, 2))
-    xwy = tf.squeeze(xwy, 2, name="alpha")
-    alpha = tf.exp(xwy)
-
-    z = tf.cast(tf.equal(x_mask, 0), dtype=tf.float32)
-
-    return tf.multiply(alpha, z)
+        with tf.variable_scope('weighted'):
+            wy = tf.add(tf.matmul(y, w), b)
+        with tf.variable_scope('linear'):
+            xwy = tf.matmul(x, tf.expand_dims(wy, 2))
+            xwy = tf.squeeze(xwy, 2, name='alpha')
+        with tf.variable_scope('score'):
+            alpha = tf.exp(xwy)
+            z = tf.cast(tf.equal(x_mask, 0), dtype=tf.float32)
+            out = tf.multiply(alpha, z)
+    return out
 
 
 # for numpy
@@ -156,7 +166,6 @@ def ztg(data, k):
 
 
 def decode(answer_scores):
-    batch_size = tf.shape(answer_scores)[0]
     answers = []
     for scores in answer_scores:
         score_s, score_e = tf.split(scores, 2)
@@ -211,106 +220,62 @@ class RnnReader(object):
         self.sess = tf.Session()
 
     def seq_attn_match(self, x, y, input_size):
-        seq_weights = tf.get_variable('qemb_match_weights', initializer=self.qemb_match_weights)
-        b = tf.get_variable('qemb_match_bias', initializer=self.qemb_match_bias)
+        seq_weights = tf.get_variable('weights', initializer=self.qemb_match_weights)
+        b = tf.get_variable('bias', initializer=self.qemb_match_bias)
         # Project vectors
-        x_re = tf.reshape(x, [-1, input_size])
-        x_pj = tf.matmul(x_re, seq_weights, transpose_b=True) + b
-        x_pj = tf.nn.relu(x_pj)
-        x_pj = tf.reshape(x_pj, [-1, tf.shape(x)[1], input_size])
+        with tf.variable_scope('project_x'):
+            x_re = tf.reshape(x, [-1, input_size])
+            x_pj = tf.matmul(x_re, seq_weights, transpose_b=True) + b
+            x_pj = tf.nn.relu(x_pj)
+            x_pj = tf.reshape(x_pj, [-1, tf.shape(x)[1], input_size])
 
-        y_re = tf.reshape(y, [-1, input_size])
-        y_pj = tf.matmul(y_re, seq_weights, transpose_b=True) + b
-        y_pj = tf.nn.relu(y_pj)
-        y_pj = tf.reshape(y_pj, [-1, tf.shape(y)[1], input_size])
-        # Compute scores
-        scores = tf.matmul(x_pj, y_pj, transpose_b=True)
+        with tf.variable_scope('project_y'):
+            y_re = tf.reshape(y, [-1, input_size])
+            y_pj = tf.matmul(y_re, seq_weights, transpose_b=True) + b
+            y_pj = tf.nn.relu(y_pj)
+            y_pj = tf.reshape(y_pj, [-1, tf.shape(y)[1], input_size])
 
-        # Normalize with softmax
-        alpha_flat = tf.reshape(scores, [-1, tf.shape(y)[1]])
-        alpha_flat = tf.nn.softmax(alpha_flat)
+        with tf.variable_scope('compute_scores'):
+            # Compute scores
+            scores = tf.matmul(x_pj, y_pj, transpose_b=True)
 
-        alpha = tf.reshape(alpha_flat, [-1, tf.shape(x)[1], tf.shape(y)[1]])
-        # Take weighted average
-        return tf.matmul(alpha, y)
+        with tf.variable_scope('normalize'):
+            # Normalize with softmax
+            alpha_flat = tf.reshape(scores, [-1, tf.shape(y)[1]])
+            alpha_flat = tf.nn.softmax(alpha_flat)
+
+        with tf.variable_scope('weighted'):
+            # Take weighted average
+            alpha = tf.reshape(alpha_flat, [-1, tf.shape(x)[1], tf.shape(y)[1]])
+            weighted_average = tf.matmul(alpha, y)
+        return weighted_average
 
     def linear_seq_attn(self, x, x_mask):
-        x_weight = tf.get_variable('self_attn_weights', initializer=self.self_attn_weights)
-        x_bias = tf.get_variable('self_attn_bias', initializer=self.self_attn_bias)
-        x_flat = tf.reshape(x, [-1, tf.shape(x)[2]])
-        scores = tf.reshape(tf.matmul(x_flat, x_weight, transpose_b=True) + x_bias, [-1, tf.shape(x)[1]])
-        x_mask = tf.cast(tf.equal(x_mask, 0), tf.float32)
+        x_weight = tf.get_variable('weights', initializer=self.self_attn_weights)
+        x_bias = tf.get_variable('bias', initializer=self.self_attn_bias)
 
-        scores = tf.multiply(tf.exp(scores), x_mask)
-        x_sum = tf.expand_dims(tf.reduce_sum(scores, axis=1), axis=1)
+        with tf.variable_scope('matmul'):
+            x_flat = tf.reshape(x, [-1, tf.shape(x)[2]])
+            scores = tf.reshape(tf.matmul(x_flat, x_weight, transpose_b=True) + x_bias, [-1, tf.shape(x)[1]])
 
-        scores = tf.expand_dims(tf.divide(scores, x_sum), axis=1)
-        return tf.squeeze(tf.matmul(scores, x), axis=1)
+        with tf.variable_scope('score'):
+            x_mask = tf.cast(tf.equal(x_mask, 0), tf.float32)
+            scores = tf.multiply(tf.exp(scores), x_mask)
+            x_sum = tf.expand_dims(tf.reduce_sum(scores, axis=1), axis=1)
 
-    def np_rnn(self, inputs):
-        # FIXME: not completed yet
-        def sigmoid(x_):
-            return 1 / (1 + np.exp(-x_))
+        with tf.variable_scope('weighted'):
+            scores = tf.expand_dims(tf.divide(scores, x_sum), axis=1)
+            out = tf.squeeze(tf.matmul(scores, x), axis=1)
 
-        def calc_cell_one_step(in_, c_, h_, weights, bias):
-            # print("h:\n{}".format(h))
-            # print("x_step:\n{}".format(x_step))
-            concat = np.concatenate([in_, h_], 1).dot(weights) + bias
-            # print("concat:{}".format(concat.shape))
-            i, j, f, o = np.split(concat, 4, axis=1)
-            # print("i:{}, j:{}, f:{}, o:{}".format(i.shape, j.shape, f.shape, o.shape))
-            new_c = (c_ * sigmoid(f + 1) + sigmoid(i) * np.tanh(j))
-            new_h = np.tanh(new_c) * sigmoid(o)
-            return new_c, new_h
-
-        batch_size = inputs.shape[0]
-        steps = inputs.shape[1]
-        inputs = np.split(inputs, steps, 1)
-        outputs = []
-        for k in range(self.question_layers):
-            fw_weights_input = self.weights['question_rnn.rnns.' + str(k) + '.weight_ih_l0']
-            fw_weights_hidden = self.weights['question_rnn.rnns.' + str(k) + '.weight_hh_l0']
-            fw_weights = np.concatenate((fw_weights_input, fw_weights_hidden), axis=1).transpose()
-
-            fw_bias_input = self.weights['question_rnn.rnns.' + str(k) + '.bias_ih_l0']
-            fw_bias_hidden = self.weights['question_rnn.rnns.' + str(k) + '.bias_hh_l0']
-            fw_bias = np.add(fw_bias_input, fw_bias_hidden)
-
-            bw_weights_input = self.weights['question_rnn.rnns.' + str(k) + '.weight_ih_l0_reverse']
-            bw_weights_hidden = self.weights['question_rnn.rnns.' + str(k) + '.weight_hh_l0_reverse']
-            bw_weights = np.concatenate((bw_weights_input, bw_weights_hidden), axis=1).transpose()
-
-            bw_bias_input = self.weights['question_rnn.rnns.' + str(k) + '.bias_ih_l0_reverse']
-            bw_bias_hidden = self.weights['question_rnn.rnns.' + str(k) + '.bias_hh_l0_reverse']
-            bw_bias = np.add(bw_bias_input, bw_bias_hidden)
-
-            c = np.zeros((batch_size, 128))
-            h = np.zeros((batch_size, 128))
-            c_r = np.zeros((batch_size, 128))
-            h_r = np.zeros((batch_size, 128))
-            reversed_inputs = list(reversed(inputs))
-            for step in range(steps):
-                input_ = inputs[step].squeeze()
-                input_reversed = reversed_inputs[step].squeeze()
-                c, h = calc_cell_one_step(input_, c, h, fw_weights, fw_bias)
-                c_r, h_r = calc_cell_one_step(input_reversed, c_r, h_r, bw_weights, bw_bias)
-                inputs[step] = h
-                reversed_inputs[step] = h_r
-            reversed_back_inputs = list(reversed(reversed_inputs))
-            inputs = [np.concatenate((h_, h_r_), 1) for h_, h_r_ in zip(inputs, reversed_back_inputs)]
-            outputs.append(np.array(inputs).transpose([1, 0, 2]))
-        out = np.concatenate(outputs, 2)
         return out
 
     def network(self, x1_emb, x1_f, x1_mask, x2_emb, x2_mask):
+        with tf.variable_scope('q_seq_attn'):
+            x2_weighted_emb = self.seq_attn_match(x1_emb, x2_emb, self.emb_shape[1])
 
-        doc_rnn_input_list = [x1_emb]
-        x2_weighted_emb = self.seq_attn_match(x1_emb, x2_emb, self.emb_shape[1])
-        doc_rnn_input_list.append(x2_weighted_emb)
-
-        doc_rnn_input_list.append(x1_f)
-
-        doc_rnn_input = tf.concat(doc_rnn_input_list, axis=2)
+        with tf.variable_scope('p_rnn_input'):
+            doc_rnn_input_list = [x1_emb, x2_weighted_emb, x1_f]
+            doc_rnn_input = tf.concat(doc_rnn_input_list, axis=2)
 
         # self.np_rnn(x2_emb.numpy())
         q_rnn_scope = 'question_rnn'
@@ -326,16 +291,19 @@ class RnnReader(object):
                                   num_layers=self.doc_layers,
                                   weights=doc_rnn_weights, scope=doc_rnn_scope)
 
-        q_weighted_hidden = self.linear_seq_attn(question_hidden, x2_mask)
+        with tf.variable_scope('q_self_attn'):
+            q_weighted_hidden = self.linear_seq_attn(question_hidden, x2_mask)
 
-        with tf.variable_scope("span_start"):
+        with tf.variable_scope('start'):
             start_scores = bi_linear_seq_attn(self.start_attn_weights.transpose(), self.start_attn_bias,
                                               doc_hidden, q_weighted_hidden, x1_mask)
 
-        with tf.variable_scope("span_end"):
+        with tf.variable_scope('end'):
             end_scores = bi_linear_seq_attn(self.end_attn_weights.transpose(), self.end_attn_bias,
                                             doc_hidden, q_weighted_hidden, x1_mask)
-        final_answer = tf.concat([start_scores, end_scores], 1, name="answer")
+
+        with tf.variable_scope('answer'):
+            final_answer = tf.concat([start_scores, end_scores], 1, name='scores')
 
         # batches = start_scores.get_shape().as_list()[0]
         # idx = tf.constant(0)
@@ -347,7 +315,7 @@ class RnnReader(object):
         # final_results = tf.while_loop(cond, decode_one, [start_scores, end_scores, idx, answers],
         #                               shape_invariants=[start_scores.get_shape(), end_scores.get_shape(),
         #                                                 idx.get_shape(), tf.TensorShape([None, 3])])
-        # final_answer = tf.identity(final_results[-1], name="answer")
+        # final_answer = tf.identity(final_results[-1], name='answer')
         return final_answer
 
 
