@@ -222,21 +222,21 @@ class RnnReader(object):
 
         self.sess = tf.Session()
 
-    def seq_attn_match(self, x, y, input_size):
+    def seq_attn_match(self, para_emb, q_emb, emb_dim):
         seq_weights = tf.get_variable('weights', initializer=self.qemb_match_weights)
         b = tf.get_variable('bias', initializer=self.qemb_match_bias)
         # Project vectors
         with tf.variable_scope('project_x'):
-            x_re = tf.reshape(x, [-1, input_size])
+            x_re = tf.reshape(para_emb, [-1, emb_dim])
             x_pj = tf.matmul(x_re, seq_weights, transpose_b=True) + b
             x_pj = tf.nn.relu(x_pj)
-            x_pj = tf.reshape(x_pj, [-1, tf.shape(x)[1], input_size])
+            x_pj = tf.reshape(x_pj, [-1, tf.shape(para_emb)[1], emb_dim])
 
         with tf.variable_scope('project_y'):
-            y_re = tf.reshape(y, [-1, input_size])
+            y_re = tf.reshape(q_emb, [-1, emb_dim])
             y_pj = tf.matmul(y_re, seq_weights, transpose_b=True) + b
             y_pj = tf.nn.relu(y_pj)
-            y_pj = tf.reshape(y_pj, [-1, tf.shape(y)[1], input_size])
+            y_pj = tf.reshape(y_pj, [-1, tf.shape(q_emb)[1], emb_dim])
 
         with tf.variable_scope('compute_scores'):
             # Compute scores
@@ -244,22 +244,22 @@ class RnnReader(object):
 
         with tf.variable_scope('normalize'):
             # Normalize with softmax
-            alpha_flat = tf.reshape(scores, [-1, tf.shape(y)[1]])
+            alpha_flat = tf.reshape(scores, [-1, tf.shape(q_emb)[1]])
             alpha_flat = tf.nn.softmax(alpha_flat)
 
         with tf.variable_scope('weighted'):
             # Take weighted average
-            alpha = tf.reshape(alpha_flat, [-1, tf.shape(x)[1], tf.shape(y)[1]])
-            weighted_average = tf.matmul(alpha, y)
+            alpha = tf.reshape(alpha_flat, [-1, tf.shape(para_emb)[1], tf.shape(q_emb)[1]])
+            weighted_average = tf.matmul(alpha, q_emb)
         return weighted_average
 
-    def linear_seq_attn(self, x):
+    def linear_seq_attn(self, q_hidden):
         x_weight = tf.get_variable('weights', initializer=self.self_attn_weights)
         x_bias = tf.get_variable('bias', initializer=self.self_attn_bias)
 
         with tf.variable_scope('matmul'):
-            x_flat = tf.reshape(x, [-1, tf.shape(x)[2]])
-            scores = tf.reshape(tf.matmul(x_flat, x_weight, transpose_b=True) + x_bias, [-1, tf.shape(x)[1]])
+            x_flat = tf.reshape(q_hidden, [-1, tf.shape(q_hidden)[2]])
+            scores = tf.reshape(tf.matmul(x_flat, x_weight, transpose_b=True) + x_bias, [-1, tf.shape(q_hidden)[1]])
 
         with tf.variable_scope('score'):
             scores = tf.exp(scores)
@@ -267,22 +267,21 @@ class RnnReader(object):
 
         with tf.variable_scope('weighted'):
             scores = tf.expand_dims(tf.divide(scores, x_sum), axis=1)
-            out = tf.squeeze(tf.matmul(scores, x), axis=1)
+            out = tf.squeeze(tf.matmul(scores, q_hidden), axis=1)
 
         return out
 
-    def network(self, x1_emb, x1_f, x1_mask, x2_emb):
+    def network(self, para_emb, para_feature, para_mask, q_emb):
         with tf.variable_scope('q_seq_attn'):
-            x2_weighted_emb = self.seq_attn_match(x1_emb, x2_emb, self.emb_shape[1])
+            q_weighted_emb = self.seq_attn_match(para_emb, q_emb, self.emb_shape[1])
 
         with tf.variable_scope('p_rnn_input'):
-            doc_rnn_input_list = [x1_emb, x2_weighted_emb, x1_f]
-            doc_rnn_input = tf.concat(doc_rnn_input_list, axis=2)
+            para_rnn_input_list = [para_emb, q_weighted_emb, para_feature]
+            para_rnn_input = tf.concat(para_rnn_input_list, axis=2)
 
-        # self.np_rnn(x2_emb.numpy())
         q_rnn_scope = 'question_rnn'
         q_rnn_weights = {k: v for k, v in self.weights.items() if k.startswith(q_rnn_scope)}
-        question_hidden = stack_bi_rnn(input_data=x2_emb,
+        question_hidden = stack_bi_rnn(input_data=q_emb,
                                        hidden_size=self.hidden_size,
                                        num_layers=self.question_layers,
                                        weights=q_rnn_weights,
@@ -291,22 +290,22 @@ class RnnReader(object):
         with tf.variable_scope('q_self_attn'):
             q_weighted_hidden = self.linear_seq_attn(question_hidden)
 
-        doc_rnn_scope = 'doc_rnn'
-        doc_rnn_weights = {k: v for k, v in self.weights.items() if k.startswith(doc_rnn_scope)}
-        doc_hidden = stack_bi_rnn(input_data=doc_rnn_input,
-                                  hidden_size=self.hidden_size,
-                                  num_layers=self.doc_layers,
-                                  weights=doc_rnn_weights,
-                                  scope=doc_rnn_scope,
-                                  mask=x1_mask)
+        para_rnn_scope = 'doc_rnn'
+        para_rnn_weights = {k: v for k, v in self.weights.items() if k.startswith(para_rnn_scope)}
+        para_hidden = stack_bi_rnn(input_data=para_rnn_input,
+                                   hidden_size=self.hidden_size,
+                                   num_layers=self.doc_layers,
+                                   weights=para_rnn_weights,
+                                   scope=para_rnn_scope,
+                                   mask=para_mask)
 
         with tf.variable_scope('start'):
             start_scores = bi_linear_seq_attn(self.start_attn_weights.transpose(), self.start_attn_bias,
-                                              doc_hidden, q_weighted_hidden, x1_mask)
+                                              para_hidden, q_weighted_hidden, para_mask)
 
         with tf.variable_scope('end'):
             end_scores = bi_linear_seq_attn(self.end_attn_weights.transpose(), self.end_attn_bias,
-                                            doc_hidden, q_weighted_hidden, x1_mask)
+                                            para_hidden, q_weighted_hidden, para_mask)
 
         with tf.variable_scope('answer'):
             final_answer = tf.concat([start_scores, end_scores], 1, name='scores')
