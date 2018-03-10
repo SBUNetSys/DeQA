@@ -227,30 +227,30 @@ class RnnReader(object):
         b = tf.get_variable('bias', initializer=self.qemb_match_bias)
         # Project vectors
         with tf.variable_scope('project_x'):
-            x_re = tf.reshape(para_emb, [-1, emb_dim])
-            x_pj = tf.matmul(x_re, seq_weights, transpose_b=True) + b
+            x_re = tf.reshape(para_emb, [-1, emb_dim])  # 434 * 300
+            x_pj = tf.matmul(x_re, seq_weights, transpose_b=True) + b  # 434 * 300
             x_pj = tf.nn.relu(x_pj)
-            x_pj = tf.reshape(x_pj, [-1, tf.shape(para_emb)[1], emb_dim])
+            x_pj = tf.reshape(x_pj, [-1, tf.shape(para_emb)[1], emb_dim])  # 2 * 217 * 300
 
         with tf.variable_scope('project_y'):
-            y_re = tf.reshape(q_emb, [-1, emb_dim])
-            y_pj = tf.matmul(y_re, seq_weights, transpose_b=True) + b
+            y_re = tf.reshape(q_emb, [-1, emb_dim])  # 12 * 300
+            y_pj = tf.matmul(y_re, seq_weights, transpose_b=True) + b  # 12 * 300
             y_pj = tf.nn.relu(y_pj)
-            y_pj = tf.reshape(y_pj, [-1, tf.shape(q_emb)[1], emb_dim])
+            y_pj = tf.reshape(y_pj, [-1, tf.shape(q_emb)[1], emb_dim])  # 2 * 6 * 300
 
         with tf.variable_scope('compute_scores'):
             # Compute scores
-            scores = tf.matmul(x_pj, y_pj, transpose_b=True)
+            scores = tf.matmul(x_pj, y_pj, transpose_b=True)  # 2 * 217 * 6
 
         with tf.variable_scope('normalize'):
             # Normalize with softmax
-            alpha_flat = tf.reshape(scores, [-1, tf.shape(q_emb)[1]])
+            alpha_flat = tf.reshape(scores, [-1, tf.shape(q_emb)[1]])  # 434 * 6
             alpha_flat = tf.nn.softmax(alpha_flat)
 
         with tf.variable_scope('weighted'):
             # Take weighted average
-            alpha = tf.reshape(alpha_flat, [-1, tf.shape(para_emb)[1], tf.shape(q_emb)[1]])
-            weighted_average = tf.matmul(alpha, q_emb)
+            alpha = tf.reshape(alpha_flat, [-1, tf.shape(para_emb)[1], tf.shape(q_emb)[1]])  # 2 * 217 * 6
+            weighted_average = tf.matmul(alpha, q_emb)  # 2 * 217 * 300
         return weighted_average
 
     def linear_seq_attn(self, q_hidden):
