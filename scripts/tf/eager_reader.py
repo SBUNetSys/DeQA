@@ -338,6 +338,7 @@ if __name__ == '__main__':
     ex_inputs[0] = np.array([emb[i] for i in ex_inputs[0]])
     ex_inputs[3] = np.array([emb[i] for i in ex_inputs[3]])
 
+    # np.savez_compressed('data/exn', **{str(k): v for k, v in enumerate(ex_inputs)})
     reader = RnnReader(args.args, args.weights_file)
     results = reader.network(*ex_inputs)
     print(results)
