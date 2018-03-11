@@ -25,7 +25,7 @@ class EarlyStoppingClassifier(nn.Module):
 
     def __init__(self):
         super(EarlyStoppingClassifier, self).__init__()
-        self.fc1 = nn.Linear(DIM, NUM_CLASS)
+        self.fc1 = nn.Linear(2, NUM_CLASS)
 
     def forward(self, input_):
         x = self.fc1(input_)

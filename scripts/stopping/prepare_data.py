@@ -13,11 +13,23 @@ from multiprocessing import Pool as ProcessPool
 import pickle as pk
 import sys
 import time
+import numpy as np
 
 ENCODING = "utf-8"
 
+DOC_MEAN = 8.5142
+DOC_STD = 2.8324
+# ANS_MEAN=86486
+# ANS_STD=256258
+ANS_MEAN = 11588614
+ANS_STD = 98865053
 
-def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_dir_, match_fn):
+all_corr_rank = []
+
+
+# def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_dir_, match_fn):
+def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_dir_, match_fn, all_doc_scores,
+                   all_ans_scores, z_scores):
     missing_count_ = 0
     total_count_ = 0
     stop_count_ = 0
@@ -41,20 +53,64 @@ def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_
 
     answer = [normalize(a) for a in data['answer']]
     prediction = json.loads(prediction_line_)
-    ranked_prediction = sorted(prediction, key=lambda k: -k['doc_score'])
+    # MAKE SURE REVERSE IS TRUE
+    ranked_prediction = sorted(prediction, key=lambda k: k['doc_score'], reverse=True)
     correct_rank = get_rank(prediction, answer, match_fn)
     if correct_rank > 150:
+        #  if correct_rank < 50 or correct_rank > 150:
         return missing_count_, total_count_, stop_count_
+
+    all_corr_rank.append(correct_rank - 1)
+
     all_n_p = []
     all_n_a = []
     all_p_scores = []
     all_a_scores = []
+    all_probs = []
+    all_spans = []
+    repeats = 0
     for i, entry in enumerate(ranked_prediction):
         doc_id = entry['doc_id']
         start = int(entry['start'])
         end = int(entry['end'])
         doc_score = entry['doc_score']
         ans_score = entry['span_score']
+        prob = entry['prob']
+        span = entry['span']
+
+        #        RESTRICT TO MAX 1000000000
+        #        print("Threshold 1000000")
+        #        ans_score=min(ans_score, 1000000) #restrict to max of million
+
+        if span in all_spans:
+            repeats += 1
+
+        all_spans.append(span)
+
+        ################Calculate sample z score (t statistic) for answer score
+        if all_a_scores == [] or len(
+                all_a_scores) == 1:  # dont use a_zscore feature at the beginning or if we only have 1
+            a_zscore = 0
+        else:  # Take the sample mean of the previous ones, take zscore of the current with respect to that
+            #            sample_mean = np.mean(all_a_scores + [ans_score])
+            sample_mean = np.mean(all_a_scores)
+            #            sample_std = np.std(all_a_scores + [ans_score])
+            sample_std = np.std(all_a_scores)
+            #            if sample_std != 0:
+            a_zscore = (ans_score - sample_mean) / sample_std
+            #            else:
+            #                a_zscore = 0
+            z_scores.append(a_zscore)
+
+        # THESE ARE FOR STATISTISTICS OVER ENTIRE DATA SET, IGNORE
+        all_doc_scores.append(doc_score)
+        all_ans_scores.append(ans_score)
+
+        corr_doc_score = (doc_score - DOC_MEAN) / DOC_STD
+        corr_ans_mean_score = (np.mean(all_a_scores + [ans_score]) - ANS_MEAN) / ANS_STD
+
+        all_probs.append(prob)
+        ###############
 
         p_pos = dict()
         p_ner = dict()
@@ -67,6 +123,7 @@ def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_
         n_a = [0 for _ in Tokenizer.FEAT]
         for feat in p_ner[doc_id] + p_pos[doc_id]:
             n_p[Tokenizer.FEAT_DICT[feat]] += 1
+
         for feat in p_ner[doc_id][start:end + 1] + p_pos[doc_id][start:end + 1]:
             n_a[Tokenizer.FEAT_DICT[feat]] += 1
 
@@ -89,12 +146,30 @@ def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_
         record['np'] = f_np
         record['na'] = f_na
         record['sa'] = f_sa
+        record['a_zscore'] = a_zscore
+        record['corr_doc_score'] = corr_doc_score
+        record['i'] = i
+        record['prob_avg'] = sum(all_probs) / len(all_probs)
+        record['prob'] = prob
+        record['repeats'] = repeats
+        record['ans_avg'] = corr_ans_mean_score
 
         if i + 1 == correct_rank:
+            #        if i + 1 >= correct_rank:
             record['stop'] = 1
             stop_count_ += 1
+
             write_record = True
+            #            if i % neg_gap_ ==0:
+            #                write_record = True
+            #            else:
+            #                write_record = False
+
             should_return = True
+        #            if i + 1 - correct_rank > 30:
+        #                should_return = True
+        #            else:
+        #                should_return = False
         else:
             should_return = False
             if i % neg_gap_ == 0:
@@ -117,10 +192,14 @@ if __name__ == '__main__':
     # below is an example run, take 114.5s(on mac mini 2012), generated 15571 records, 7291 of them are stop labels
     # python prepare_data.py -p CuratedTrec-test-lstm.preds.txt -a CuratedTrec-test.txt -f trec -r records
     #
+    all_doc_scores = []
+    all_ans_scores = []
+    z_scores = []
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--prediction_file',
-                        help='prediction file, e.g. CuratedTrec-test-lstm.preds.txt')
-    parser.add_argument('-a', '--answer_file', help='data set with labels, e.g. CuratedTrec-test.txt')
+                        help='prediction file, e.g. CuratedTrec-test-lstm.preds_train.txt')
+    parser.add_argument('-a', '--answer_file', help='data set with labels, e.g. CuratedTrec-test_train.txt')
     parser.add_argument('-nm', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
     parser.add_argument('-ns', '--negative_scale', type=int, default=10, help='scale factor for negative samples')
     parser.add_argument('-r', '--record_dir', default=None, help='dir to save generated records data set')
@@ -148,8 +227,12 @@ if __name__ == '__main__':
     if args.no_multiprocess:
         for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                               open(prediction_file, encoding=ENCODING)):
+            #       missing, total, stop = process_record(data_line, prediction_line, args.negative_scale,
+            #                                             feature_dir, record_dir, match_func)
             missing, total, stop = process_record(data_line, prediction_line, args.negative_scale,
-                                                  feature_dir, record_dir, match_func)
+                                                  feature_dir, record_dir, match_func, all_doc_scores, all_ans_scores,
+                                                  z_scores)
+
             missing_count += missing
             stop_count += stop
             total_count += total
@@ -178,3 +261,24 @@ if __name__ == '__main__':
     print('%d stop labels' % stop_count)
     print('%d docs not found' % missing_count)
     print('took %.4f s' % (e - s))
+    # all_ans_scores = list(map(lambda x: min([x, 1000000]), all_ans_scores))
+    doc_mean = np.mean(all_doc_scores)
+    ans_mean = np.mean(all_ans_scores)
+    doc_std = np.std(all_doc_scores)
+    ans_std = np.std(all_ans_scores)
+    z_std = np.std(z_scores)
+    z_mean = np.mean(z_scores)
+
+    print("Doc Mean {}".format(doc_mean))
+    print("Doc Std {}".format(doc_std))
+    print("Ans Mean {}".format(ans_mean))
+    print("Ans Std {}".format(ans_std))
+    print("Doc Max {}".format(max(all_doc_scores)))
+    print("Ans Max {}".format(max(all_ans_scores)))
+
+    print("Z Std {}".format(z_std))
+    print("Z Max {}".format(max(z_scores)))
+    print("Z Mean {}".format(z_mean))
+    print(len(all_corr_rank))
+    print("i Std {}".format(np.std(all_corr_rank)))
+    print("i Mean {}".format(np.mean(all_corr_rank)))
