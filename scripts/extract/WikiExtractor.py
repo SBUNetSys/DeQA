@@ -619,7 +619,7 @@ class Extractor(object):
             # out.write(footer)
             seq = 1
             for line in text:
-                if not line or len(line.split()) < 50:
+                if not line or len(line.split()) < 10:
                     continue
                 # logging.info('%.4f s elapsed %d articles, %d paras, current article: %s',
                 #              elapsed_time, article_count, para_count, self.title)
