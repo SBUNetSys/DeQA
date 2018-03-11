@@ -565,31 +565,13 @@ class Extractor(object):
         :param text: the text of the page
         """
         url = get_url(self.id)
-        if options.write_json:
-            # json_data = {
-            #     'id': self.id,
-            #     'url': url,
-            #     'title': self.title,
-            #     'text': "\n".join(text)
-            # }
-            # if options.print_revision:
-            #     json_data['revid'] = self.revid
-            # # We don't use json.dump(data, out) because we want to be
-            # # able to encode the string if the output is sys.stdout
-            # out_str = json.dumps(json_data, ensure_ascii=False)
-            # if out == sys.stdout:  # option -a or -o -
-            #     out_str = out_str.encode('utf-8')
-            # out.write(out_str)
-            # out.write('\n')
-            seq = 1
-            for line in text:
-                if not line:
-                    continue
+        if options.doc_type == 'doc':
+            if options.write_json:
                 json_data = {
-                    'id': '{}_{}'.format(self.id, seq),
+                    'id': self.id,
                     'url': url,
                     'title': self.title,
-                    'text': line
+                    'text': "\n".join(text)
                 }
                 if options.print_revision:
                     json_data['revid'] = self.revid
@@ -600,40 +582,56 @@ class Extractor(object):
                     out_str = out_str.encode('utf-8')
                 out.write(out_str)
                 out.write('\n')
-                seq += 1
-
-        else:
-            # if options.print_revision:
-            #     header = '<doc id="%s" revid="%s" url="%s" title="%s">\n' % (self.id, self.revid, url, self.title)
-            # else:
-            #     header = '<doc id="%s" url="%s" title="%s">\n' % (self.id, url, self.title)
-            # footer = "\n</doc>\n"
-            # if out == sys.stdout:   # option -a or -o -
-            #     header = header.encode('utf-8')
-            # out.write(header)
-            # for line in text:
-            #     if out == sys.stdout:   # option -a or -o -
-            #         line = line.encode('utf-8')
-            #     out.write(line)
-            #     out.write('\n')
-            # out.write(footer)
-            seq = 1
-            for line in text:
-                if not line or len(line.split()) < 10:
-                    continue
-                # logging.info('%.4f s elapsed %d articles, %d paras, current article: %s',
-                #              elapsed_time, article_count, para_count, self.title)
-                sys.stdout.flush()
-                header = '<DOC>\n<DOCNO>%s_%d</DOCNO>\n' % (self.id, seq)
+            else:
+                header = '<DOC>\n<DOCNO>%s</DOCNO>\n' % self.id
                 title = '<TITLE>%s</TITLE>\n' % self.title
                 text_header = '<TEXT>\n'
                 footer = '\n</TEXT>\n</DOC>\n'
                 out.write(header)
                 out.write(title)
                 out.write(text_header)
-                out.write(line)
+                out.write("\n".join(text))
                 out.write(footer)
-                seq += 1
+        else:
+            if options.write_json:
+                seq = 1
+                for line in text:
+                    if not line:
+                        continue
+                    json_data = {
+                        'id': '{}_{}'.format(self.id, seq),
+                        'url': url,
+                        'title': self.title,
+                        'text': line
+                    }
+                    if options.print_revision:
+                        json_data['revid'] = self.revid
+                    # We don't use json.dump(data, out) because we want to be
+                    # able to encode the string if the output is sys.stdout
+                    out_str = json.dumps(json_data, ensure_ascii=False)
+                    if out == sys.stdout:  # option -a or -o -
+                        out_str = out_str.encode('utf-8')
+                    out.write(out_str)
+                    out.write('\n')
+                    seq += 1
+            else:
+                seq = 1
+                for line in text:
+                    if not line or len(line.split()) < options.filter_size:
+                        continue
+                    # logging.info('%.4f s elapsed %d articles, %d paras, current article: %s',
+                    #              elapsed_time, article_count, para_count, self.title)
+                    sys.stdout.flush()
+                    header = '<DOC>\n<DOCNO>%s_%d</DOCNO>\n' % (self.id, seq)
+                    title = '<TITLE>%s</TITLE>\n' % self.title
+                    text_header = '<TEXT>\n'
+                    footer = '\n</TEXT>\n</DOC>\n'
+                    out.write(header)
+                    out.write(title)
+                    out.write(text_header)
+                    out.write(line)
+                    out.write(footer)
+                    seq += 1
 
     def extract(self, out):
         """
@@ -3140,6 +3138,11 @@ def main():
     parser.add_argument("input",
                         help="XML wiki dump file")
     groupO = parser.add_argument_group('Output')
+    groupO.add_argument("-dt", "--doc_type", default="para", choice=("para", "doc"),
+                        help="extract dumps either in document or paragraph form")
+    groupO.add_argument("-fs", "--filter_size", default=10, type=int,
+                        help="the words size used to filter paragraph or document")
+
     groupO.add_argument("-o", "--output", default="text",
                         help="directory for extracted files (or '-' for dumping to stdout)")
     groupO.add_argument("-b", "--bytes", default="1M",
@@ -3199,6 +3202,8 @@ def main():
     options.keepLists = args.lists
     options.toHTML = args.html
     options.write_json = args.json
+    options.doc_type = args.doc_type
+    options.filter_size = args.filter_size
     options.print_revision = args.revision
     options.min_text_length = args.min_text_length
     if args.html:
