@@ -16,3 +16,7 @@ python scripts/stopping/linear_model.py -p data/SQuAD-v1.1-dev-2k-multitask-lstm
 python scripts/stopping/eval_model.py -p data/SQuAD-v1.1-dev-1k-multitask-lstm.preds.txt -a data/SQuAD-v1.1-dev-1k.txt -f data/squad -m linear_model_84.40610428916152.mdl
 
 
+## Generating and evaluating early stopping predictions
+
+python scripts/stopping/eval_model.py -a data/datasets/CuratedTrec-test.txt -p data/CuratedTrec-test-multitask-nm.preds.txt -r -m linear_model61_4_6.mdl.train
+python stats/analyze_answer.py -a data/datasets/CuratedTrec-test.txt -p data/CuratedTrec-test-multitask-nm.preds.txt.es.txt -r -ans
