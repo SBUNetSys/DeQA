@@ -3138,7 +3138,7 @@ def main():
     parser.add_argument("input",
                         help="XML wiki dump file")
     groupO = parser.add_argument_group('Output')
-    groupO.add_argument("-dt", "--doc_type", default="para", choice=("para", "doc"),
+    groupO.add_argument("-dt", "--doc_type", default="para", choices=("para", "doc"),
                         help="extract dumps either in document or paragraph form")
     groupO.add_argument("-fs", "--filter_size", default=10, type=int,
                         help="the words size used to filter paragraph or document")
