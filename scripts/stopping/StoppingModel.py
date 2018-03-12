@@ -10,6 +10,8 @@ from torch.autograd import Variable
 import logging
 import pickle as pk
 from utils import Tokenizer
+import numpy 
+import math
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
@@ -18,18 +20,36 @@ ENCODING = "utf-8"
 H = 32
 NUM_CLASS = 2
 NLP_NUM = len(Tokenizer.FEAT)
-DIM = 1 * 4 + 4 * NLP_NUM * 2 + NLP_NUM
+
+#DIM = 1 * 4 + 4 * NLP_NUM * 2 + NLP_NUM
+
+#DIM = 2 + NLP_NUM*4
+DIM = 7 #+ NLP_NUM*4 + NLP_NUM
+#DIM = 1 * 4 + 4 * NLP_NUM * 2 + NLP_NUM + 1
+
+I_STD=28.56
+I_MEAN=14.08
+#Z_STD = 54659
+#Z_MEAN = 669.91
+Z_STD = 241297
+Z_MEAN = 3164
+
+ANS_MEAN=86486
+ANS_STD=256258
+
+
 
 
 class EarlyStoppingClassifier(nn.Module):
 
     def __init__(self):
         super(EarlyStoppingClassifier, self).__init__()
-        self.fc1 = nn.Linear(2, NUM_CLASS)
+        self.fc1 = nn.Linear(DIM, NUM_CLASS)
 
     def forward(self, input_):
         x = self.fc1(input_)
         return F.log_softmax(x)
+        #return F.sigmoid(x)
 
 
 class EarlyStoppingModel(object):
@@ -90,8 +110,10 @@ class EarlyStoppingModel(object):
             # return stop probability
             if dim:
                 return torch.exp(score[:, 1])
+            #    return score[:, 1]
             else:
                 return torch.exp(score)[1]
+            #    return score[0]
         else:
             return predicted_score
 
@@ -184,19 +206,56 @@ class RecordDataset(Dataset):
         else:
             print('warning: %s not exist!' % record_)
         sp = torch.FloatTensor(record_data['sp'])  # 4x1
-        # sa = torch.FloatTensor(record_data['sa'])  # 2x1
+        sa = torch.FloatTensor(record_data['sa'])  # 1x1
+        a_zscore = torch.FloatTensor(list([record_data['a_zscore']])) #1
+        max_zscore = torch.FloatTensor(list([record_data['max_zscore']])) #1
+        abs_a_zscore = torch.FloatTensor(list([abs(record_data['a_zscore'])])) #1
 
+        if record_data['max_zscore'] > 0:
+            log_max_zscore = math.log(record_data['max_zscore'])
+        else:
+            log_max_zscore = 0
+
+        log_max_zscore = torch.FloatTensor([log_max_zscore])
+
+        az_norm = (record_data['a_zscore'] - Z_MEAN) / Z_STD
+        if record_data['a_zscore'] != 0:
+            a_zscore_norm = torch.FloatTensor(list([az_norm])) #1
+        else:
+            a_zscore_norm = a_zscore
+
+        corr_doc_score= torch.FloatTensor(list([record_data['corr_doc_score']])) #1
+
+#Uncomment later
         np = torch.FloatTensor(record_data['np'])  # 4x58
         na = torch.FloatTensor(record_data['na'])  # 4x58
         nq = torch.FloatTensor(record_data['nq'])  # 1x58
+        i_ft = torch.FloatTensor([record_data['i']])  # 1x58
 
-        # hq = torch.FloatTensor(record_data['hq'])
-        # hp = torch.FloatTensor(record_data['hp'])
-        # ha = torch.FloatTensor(record_data['ha'])  # 4x768
 
-        # ft = torch.cat([sp, sa, nq, np, na, hq, hp, ha])
-        # ft = torch.cat([sp, sa, nq, np, na])
-        ft = torch.cat([sp, nq, np, na])
+        repeats = torch.FloatTensor([record_data['repeats']])
+
+        i_std = (record_data['i'] - I_MEAN) / I_STD
+        i_std = torch.FloatTensor([i_std])
+
+        prob_avg = torch.FloatTensor([record_data['prob_avg']])  # 1x58
+
+        ans_avg = torch.FloatTensor([record_data['ans_avg']])
+
+        repeats_2 = 1 if record_data['repeats'] == 2 else 0
+        repeats_3 = 1 if record_data['repeats'] == 3 else 0
+        repeats_4 = 1 if record_data['repeats'] == 4 else 0
+        repeats_5 = 1 if record_data['repeats'] >= 5 else 0
+        past20 = 1 if record_data['i'] >= 20 else 0
+
+        repeats_2 = torch.FloatTensor([repeats_2])
+        repeats_3 = torch.FloatTensor([repeats_3])
+        repeats_4 = torch.FloatTensor([repeats_4])
+        repeats_5 = torch.FloatTensor([repeats_5])
+        past20 = torch.FloatTensor([past20])
+
+        #FINAL FEATS
+        ft = torch.cat([corr_doc_score, log_max_zscore, repeats_2, repeats_3, repeats_4, repeats_5, past20])
 
         if has_label:
             label = record_data['stop']
