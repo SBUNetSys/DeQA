@@ -436,9 +436,9 @@ class DrQA(object):
                                                                                                      f_ans, s_tokens,
                                                                                                      repeats, all_spans,
                                                                                                      processed_count)
-            all_spans.extend(all_spans_)
-            all_a_z_scores.extend(all_a_z_scores_)
-            repeats += repeats_
+            all_spans = all_spans_
+            all_a_z_scores = all_a_z_scores_
+            repeats = repeats_
             predictions.extend(batch_predictions)
             if stop:
                 break
