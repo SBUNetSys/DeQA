@@ -309,7 +309,7 @@ class DrQA(object):
         for queue in queues:
             predictions = []
             while len(queue) > 0:
-                score, (qidx, rel_didx, sidx), s, e, entropy, prob = heapq.heappop(queue)
+                score, (qidx, rel_didx, sidx), s, e = heapq.heappop(queue)
                 prediction = {
                     'doc_id': all_docids[qidx][rel_didx],
                     'start': int(s),
