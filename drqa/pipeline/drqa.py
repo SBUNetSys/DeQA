@@ -296,7 +296,7 @@ class DrQA(object):
             for i in range(batch_size):
                 # We take the top prediction per split.
                 if len(score[i]) > 0:
-                    item = (score[i][0], ex_ids[i], s[i][0], e[i][0], entropy[i], prob[i])
+                    item = (score[i][0], ex_ids[i], s[i][0], e[i][0])
                     queue = queues[ex_ids[i][0]]
                     if len(queue) < top_n:
                         heapq.heappush(queue, item)
