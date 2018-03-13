@@ -322,8 +322,8 @@ class DocReader(object):
         pred_s = []
         pred_e = []
         pred_score = []
-        pred_entropy = []
-        pred_prob = []
+        # pred_entropy = []
+        # pred_prob = []
         max_len = max_len or score_s.size(1)
         t1 = time.time()
         for i in range(score_s.size(0)):
@@ -337,13 +337,13 @@ class DocReader(object):
             scores = scores.numpy()
 
             scores_flat = scores.flatten()
-            nz_scores = scores_flat[np.nonzero(scores_flat)]
-            e_x = np.exp(nz_scores - np.max(nz_scores))
-            nz_prob = e_x / np.sum(e_x)
-            nz_prob = np.clip(nz_prob, 1e-15, 1-1e-5)
+            # nz_scores = scores_flat[np.nonzero(scores_flat)]
+            # e_x = np.exp(nz_scores - np.max(nz_scores))
+            # nz_prob = e_x / np.sum(e_x)
+            # nz_prob = np.clip(nz_prob, 1e-15, 1-1e-5)
 
-            entropy = -np.sum((nz_prob * np.log(nz_prob)))
-            ans_prob = np.max(nz_prob)
+            # entropy = -np.sum((nz_prob * np.log(nz_prob)))
+            # ans_prob = np.max(nz_prob)
             if top_n == 1:
                 idx_sort = [np.argmax(scores_flat)]
             elif len(scores_flat) < top_n:
@@ -352,14 +352,14 @@ class DocReader(object):
                 idx = np.argpartition(-scores_flat, top_n)[0:top_n]
                 idx_sort = idx[np.argsort(-scores_flat[idx])]
             s_idx, e_idx = np.unravel_index(idx_sort, scores.shape)
-            pred_entropy.append(entropy)
-            pred_prob.append(ans_prob)
+            # pred_entropy.append(entropy)
+            # pred_prob.append(ans_prob)
             pred_s.append(s_idx)
             pred_e.append(e_idx)
             pred_score.append(scores_flat[idx_sort])
         t2 = time.time()
         logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
-        return pred_s, pred_e, pred_score, pred_entropy, pred_prob
+        return pred_s, pred_e, pred_score
 
     @staticmethod
     def decode_candidates(score_s, score_e, candidates, top_n=1, max_len=None):
