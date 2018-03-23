@@ -325,5 +325,9 @@ if __name__ == "__main__":
 
     # Process!
     outname = os.path.splitext(args.data_name)[0]
+
+    if not os.path.exists(args.out_dir):
+        os.makedirs(args.out_dir)
+
     outfile = os.path.join(args.out_dir, outname)
     process(questions, answers, outfile, opts)
