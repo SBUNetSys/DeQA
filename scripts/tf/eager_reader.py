@@ -144,18 +144,6 @@ def bi_linear_seq_attn(bi_w, bi_bias, x, y, x_mask):
     return out
 
 
-# for numpy
-def zng(data, k):
-    n = data.shape[0]
-    mask_u = np.greater_equal.outer(np.arange(n), np.arange(1, n + 1))
-    mask_l = np.greater_equal.outer(np.arange(n), np.arange(-k + 1, n - k + 1))
-    tri = np.where(mask_u, 0, data)  # tri_u
-    # print(tri)
-    tri2 = np.where(mask_l, tri, 0)  # tri_l
-    return tri2
-
-
-# for TensorFlow
 def ztg(data, k):
     n = data.get_shape().as_list()[0]
     mask_u = tf.greater_equal(tf.tile(tf.reshape(tf.range(n), [n, 1]), [1, n]),
@@ -310,17 +298,6 @@ class RnnReader(object):
         with tf.variable_scope('answer'):
             final_answer = tf.concat([start_scores, end_scores], 1, name='scores')
 
-        # batches = start_scores.get_shape().as_list()[0]
-        # idx = tf.constant(0)
-        #
-        # def cond(_s, _e, idx_, _a):
-        #     return idx_ < (batches or 1)
-        #
-        # answers = tf.constant([-1, -1, -1.0], dtype=tf.float32, shape=[1, 3])
-        # final_results = tf.while_loop(cond, decode_one, [start_scores, end_scores, idx, answers],
-        #                               shape_invariants=[start_scores.get_shape(), end_scores.get_shape(),
-        #                                                 idx.get_shape(), tf.TensorShape([None, 3])])
-        # final_answer = tf.identity(final_results[-1], name='answer')
         return final_answer
 
 
