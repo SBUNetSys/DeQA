@@ -139,7 +139,7 @@ def set_defaults(args):
     if not args.model_name:
         import uuid
         import time
-        args.model_name = time.strftime("%Y%m%d-") + str(uuid.uuid4())[:8]
+        args.model_name = args.rnn_type + time.strftime("%Y%m%d-") + str(uuid.uuid4())[:8]
 
     # Set log + model file names
     args.log_file = os.path.join(args.model_dir, args.model_name + '.txt')
