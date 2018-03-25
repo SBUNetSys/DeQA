@@ -316,10 +316,14 @@ if __name__ == '__main__':
                     for n, k in zip(input_names, ex_inputs)]
     final_answers = reader.network(*placeholders)
     sess = reader.sess
+    np_weights = dict()
     for var in tf.global_variables():
-        # sess.run(var.initializer)
+        sess.run(var.initializer)
         # print(sess.run(var))
-        print(var.name[:-2], var.shape)
+        var_name = var.name[:-2]
+        print(var_name, var.shape)
+        np_weights[var_name] = sess.run(var)
+    np.savez_compressed('data/lstm_reader', **{k: v for k, v in np_weights.items()})
     sess.run(tf.global_variables_initializer())
     # print(sess.run(tf.report_uninitialized_variables()))
 
