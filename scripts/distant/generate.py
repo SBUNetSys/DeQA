@@ -188,7 +188,7 @@ def gen_pairs(q, a, batch_size=100):
 def process(questions_, answers_, outfile_, opts_):
     """Generate examples for all questions."""
     logger.info('Processing %d question answer pairs...' % len(questions_))
-    logger.info('Will save to %s.dstrain.txt and %s.dsdev.txt' % (outfile_, outfile_))
+    logger.info('Will save to %s.dstrain.txt' % outfile_)
     # Load ranker
     ranker = opts_['ranker_class']()
     logger.info('Ranking documents (top %d per question)...' % opts_['n_docs'])
@@ -197,7 +197,7 @@ def process(questions_, answers_, outfile_, opts_):
     cnt = 0
     batch_no = 1
     total_batches = int(len(questions_)/batch_size_) + 1
-    with open(outfile_ + '.dstrain.txt', 'w') as f_train, open(outfile_ + '.dsdev.txt', 'w') as f_dev:
+    with open(outfile_ + '.dstrain.txt', 'w') as f_train:
         for batch_questions, batch_answers in gen_pairs(questions_, answers_, batch_size_):
             logger.info('Processing %d/%d question answer pairs...' % (batch_no, total_batches))
 
@@ -227,9 +227,8 @@ def process(questions_, answers_, outfile_, opts_):
             for res in workers.imap_unordered(search_fn, inputs):
                 for ex in res:
                     cnt += 1
-                    f = f_dev if random.random() < opts_['dev_split'] else f_train
-                    f.write(json.dumps(ex))
-                    f.write('\n')
+                    f_train.write(json.dumps(ex))
+                    f_train.write('\n')
 
             workers.close()
             workers.join()
@@ -252,8 +251,6 @@ if __name__ == "__main__":
     dataset = parser.add_argument_group('Dataset')
     dataset.add_argument('--regex', action='store_true',
                          help='Flag if answers are expressed as regexps')
-    dataset.add_argument('--dev-split', type=float, default=0,
-                         help='Hold out for ds dev set (0.X)')
 
     search = parser.add_argument_group('Search Heuristic')
     search.add_argument('--match-threshold', type=int, default=1,
@@ -262,15 +259,15 @@ if __name__ == "__main__":
                         help='Maximum allowed context length')
     search.add_argument('--char-min', type=int, default=25,
                         help='Minimum allowed context length')
-    search.add_argument('--window-sz', type=int, default=20,
+    search.add_argument('--window-sz', type=int, default=10,
                         help='Use context on +/- window_sz for overlap measure')
 
     general = parser.add_argument_group('General')
-    general.add_argument('--max-ex', type=int, default=5,
+    general.add_argument('--max-ex', type=int, default=2,
                          help='Maximum matches generated per question')
     general.add_argument('--n-docs', type=int, default=150,
                          help='Number of docs retrieved per question')
-    general.add_argument('--batch_size', type=int, default=1000,
+    general.add_argument('--batch_size', type=int, default=100,
                          help='Number of qa pairs to process at one time')
     general.add_argument('--tokenizer', type=str, default='corenlp')
     general.add_argument('--ranker', type=str, default='lucene')
