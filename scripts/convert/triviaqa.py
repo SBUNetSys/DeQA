@@ -12,7 +12,7 @@ with open(args.input) as f:
 
 # Iterate and write question-answer pairs
 count = 0
-with open(args.input) as fi, open(args.output, 'w') as fo:
+with open(args.output, 'w') as fo:
     for item in dataset['Data']:
         question = item['Question']
         answer = item['Answer']['Aliases']
