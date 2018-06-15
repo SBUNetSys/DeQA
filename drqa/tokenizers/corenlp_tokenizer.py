@@ -11,10 +11,11 @@ Serves commands to a java subprocess running the jar. Requires java 8.
 
 import copy
 import json
+
 import pexpect
 
-from .tokenizer import Tokens, Tokenizer
 from . import DEFAULTS
+from .tokenizer import Tokens, Tokenizer
 
 
 class CoreNLPTokenizer(Tokenizer):
@@ -110,8 +111,10 @@ class CoreNLPTokenizer(Tokenizer):
             else:
                 end_ws = tokens[i]['characterOffsetEnd']
 
+            converted_words = self._convert(tokens[i]['word'])
             data.append((
-                self._convert(tokens[i]['word']),
+                converted_words,
+                converted_words[0] if len(converted_words) > 0 else '',
                 text[start_ws: end_ws],
                 (tokens[i]['characterOffsetBegin'],
                  tokens[i]['characterOffsetEnd']),

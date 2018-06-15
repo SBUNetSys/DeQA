@@ -4,21 +4,21 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-"""DrQA Document Reader model"""
+"""Document Reader model"""
 
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
-import os
+import logging
 import copy
-from ..pipeline import DEFAULTS
+import time
 from torch.autograd import Variable
 from .config import override_model_args
+from .r_net import R_Net
 from .rnn_reader import RnnDocReader
-from . import layers
-import logging
-import time
+from .m_reader import MnemonicReader
+from .data import Dictionary
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +32,14 @@ class DocReader(object):
     # Initialization
     # --------------------------------------------------------------------------
 
-    def __init__(self, args, word_dict, feature_dict,
+    def __init__(self, args, word_dict, char_dict, feature_dict,
                  state_dict=None, normalize=True):
         # Book-keeping.
         self.args = args
         self.word_dict = word_dict
+        self.char_dict = char_dict
         self.args.vocab_size = len(word_dict)
+        self.args.char_size = len(char_dict)
         self.feature_dict = feature_dict
         self.args.num_features = len(feature_dict)
         self.updates = 0
@@ -46,8 +48,12 @@ class DocReader(object):
 
         # Building network. If normalize if false, scores are not normalized
         # 0-1 per paragraph (no softmax).
-        if args.model_type == 'rnn':
+        if args.model_type == 'drqa':
             self.network = RnnDocReader(args, normalize)
+        elif args.model_type == 'rnet':
+            self.network = R_Net(args, normalize)
+        elif args.model_type == 'mnemonic':
+            self.network = MnemonicReader(args, normalize)
         else:
             raise RuntimeError('Unsupported model: %s' % args.model_type)
 
@@ -91,6 +97,36 @@ class DocReader(object):
         # Return added words
         return to_add
 
+    def expand_char_dictionary(self, chars):
+        """Add chars to the DocReader dictionary if they do not exist. The
+        underlying embedding matrix is also expanded (with random embeddings).
+
+        Args:
+            chars: iterable of tokens to add to the dictionary.
+        Output:
+            added: set of tokens that were added.
+        """
+        to_add = {self.char_dict.normalize(w) for w in chars
+                  if w not in self.char_dict}
+
+        # Add chars to dictionary and expand embedding layer
+        if len(to_add) > 0:
+            logger.info('Adding %d new chars to dictionary...' % len(to_add))
+            for w in to_add:
+                self.char_dict.add(w)
+            self.args.char_size = len(self.char_dict)
+            logger.info('New char size: %d' % len(self.char_dict))
+
+            old_char_embedding = self.network.char_embedding.weight.data
+            self.network.char_embedding = torch.nn.Embedding(self.args.char_size,
+                                                             self.args.char_embedding_dim,
+                                                             padding_idx=0)
+            new_char_embedding = self.network.char_embedding.weight.data
+            new_char_embedding[:old_char_embedding.size(0)] = old_char_embedding
+
+        # Return added chars
+        return to_add
+
     def load_embeddings(self, words, embedding_file):
         """Load pretrained embeddings for a given list of words, if they exist.
 
@@ -109,9 +145,6 @@ class DocReader(object):
         with open(embedding_file, encoding="utf-8") as f:
             for line in f:
                 parsed = line.rstrip().split(' ')
-                if len(parsed) == 2:
-                    # skip fast text first line header, which should be: 2519370 300
-                    continue
                 assert (len(parsed) == embedding.size(1) + 1)
                 w = self.word_dict.normalize(parsed[0])
                 if w in words:
@@ -131,6 +164,42 @@ class DocReader(object):
 
         logger.info('Loaded %d embeddings (%.2f%%)' %
                     (len(vec_counts), 100 * len(vec_counts) / len(words)))
+
+    def load_char_embeddings(self, chars, char_embedding_file):
+        """Load pretrained embeddings for a given list of chars, if they exist.
+
+        Args:
+            chars: iterable of tokens. Only those that are indexed in the
+              dictionary are kept.
+            char_embedding_file: path to text file of embeddings, space separated.
+        """
+        chars = {w for w in chars if w in self.char_dict}
+        logger.info('Loading pre-trained embeddings for %d chars from %s' %
+                    (len(chars), char_embedding_file))
+        char_embedding = self.network.char_embedding.weight.data
+
+        # When normalized, some chars are duplicated. (Average the embeddings).
+        vec_counts = {}
+        with open(char_embedding_file) as f:
+            for line in f:
+                parsed = line.rstrip().split(' ')
+                assert (len(parsed) == char_embedding.size(1) + 1)
+                w = self.char_dict.normalize(parsed[0])
+                if w in chars:
+                    vec = torch.Tensor([float(i) for i in parsed[1:]])
+                    if w not in vec_counts:
+                        vec_counts[w] = 1
+                        char_embedding[self.char_dict[w]].copy_(vec)
+                    else:
+                        logging.warning('WARN: Duplicate char embedding found for %s' % w)
+                        vec_counts[w] = vec_counts[w] + 1
+                        char_embedding[self.char_dict[w]].add_(vec)
+
+        for w, c in vec_counts.items():
+            char_embedding[self.char_dict[w]].div_(c)
+
+        logger.info('Loaded %d char embeddings (%.2f%%)' %
+                    (len(vec_counts), 100 * len(vec_counts) / len(chars)))
 
     def tune_embeddings(self, words):
         """Unfix the embeddings of a list of words. This is only relevant if
@@ -184,12 +253,16 @@ class DocReader(object):
                 p.requires_grad = False
         parameters = [p for p in self.network.parameters() if p.requires_grad]
         if self.args.optimizer == 'sgd':
-            self.optimizer = optim.SGD(parameters, self.args.learning_rate,
+            self.optimizer = optim.SGD(parameters, lr=self.args.learning_rate,
                                        momentum=self.args.momentum,
                                        weight_decay=self.args.weight_decay)
         elif self.args.optimizer == 'adamax':
-            self.optimizer = optim.Adamax(parameters, self.args.learning_rate,
+            self.optimizer = optim.Adamax(parameters,
                                           weight_decay=self.args.weight_decay)
+        elif self.args.optimizer == 'adadelta':
+            self.optimizer = optim.Adadelta(parameters, lr=self.args.learning_rate,
+                                            rho=self.args.rho, eps=self.args.eps,
+                                            weight_decay=self.args.weight_decay)
         else:
             raise RuntimeError('Unsupported optimizer: %s' %
                                self.args.optimizer)
@@ -208,14 +281,13 @@ class DocReader(object):
 
         # Transfer to GPU
         if self.use_cuda:
-            inputs = [e if e is None else Variable(e.cuda(async=True))
-                      for e in ex[:5]]
-            target_s = Variable(ex[5].cuda(async=True))
-            target_e = Variable(ex[6].cuda(async=True))
+            inputs = [e if e is None else Variable(e.cuda(async=True)) for e in ex[:-3]]
+            target_s = Variable(ex[-3].cuda(async=True))
+            target_e = Variable(ex[-2].cuda(async=True))
         else:
-            inputs = [e if e is None else Variable(e) for e in ex[:5]]
-            target_s = Variable(ex[5])
-            target_e = Variable(ex[6])
+            inputs = [e if e is None else Variable(e) for e in ex[:-3]]
+            target_s = Variable(ex[-3])
+            target_e = Variable(ex[-2])
 
         # Run forward
         score_s, score_e = self.network(*inputs)
@@ -228,8 +300,8 @@ class DocReader(object):
         loss.backward()
 
         # Clip gradients
-        torch.nn.utils.clip_grad_norm(self.network.parameters(),
-                                      self.args.grad_clipping)
+        torch.nn.utils.clip_grad_norm_(self.network.parameters(),
+                                       self.args.grad_clipping)
 
         # Update parameters
         self.optimizer.step()
@@ -238,7 +310,7 @@ class DocReader(object):
         # Reset any partially fixed parameters (e.g. rare words)
         self.reset_parameters()
 
-        return loss.data[0], ex[0].size(0)
+        return loss.item(), ex[0].size(0)
 
     def reset_parameters(self):
         """Reset any partially fixed parameters to original states."""
@@ -282,16 +354,14 @@ class DocReader(object):
         self.network.eval()
         # Transfer to GPU
         if self.use_cuda:
-            inputs = [e if e is None else
-                      Variable(e.cuda(async=True), volatile=True)
-                      for e in ex[:5]]
+            inputs = [e if e is None else Variable(e.cuda(async=True)) for e in ex[:7]]
         else:
-            inputs = [e if e is None else Variable(e, volatile=True)
-                      for e in ex[:5]]
+            inputs = [e if e is None else Variable(e) for e in ex[:7]]
         t2 = time.time()
         logger.debug('input processing [time]: %.4f s' % (t2 - t1))
         # Run forward
         score_s, score_e = self.network(*inputs)
+        del inputs
 
         # Decode predictions
         score_s = score_s.data.cpu()
@@ -322,10 +392,7 @@ class DocReader(object):
         pred_s = []
         pred_e = []
         pred_score = []
-        # pred_entropy = []
-        # pred_prob = []
         max_len = max_len or score_s.size(1)
-        t1 = time.time()
         for i in range(score_s.size(0)):
             # Outer product of scores to get full p_s * p_e matrix
             scores = torch.ger(score_s[i], score_e[i])
@@ -335,15 +402,7 @@ class DocReader(object):
 
             # Take argmax or top n
             scores = scores.numpy()
-
             scores_flat = scores.flatten()
-            # nz_scores = scores_flat[np.nonzero(scores_flat)]
-            # e_x = np.exp(nz_scores - np.max(nz_scores))
-            # nz_prob = e_x / np.sum(e_x)
-            # nz_prob = np.clip(nz_prob, 1e-15, 1-1e-5)
-
-            # entropy = -np.sum((nz_prob * np.log(nz_prob)))
-            # ans_prob = np.max(nz_prob)
             if top_n == 1:
                 idx_sort = [np.argmax(scores_flat)]
             elif len(scores_flat) < top_n:
@@ -352,13 +411,10 @@ class DocReader(object):
                 idx = np.argpartition(-scores_flat, top_n)[0:top_n]
                 idx_sort = idx[np.argsort(-scores_flat[idx])]
             s_idx, e_idx = np.unravel_index(idx_sort, scores.shape)
-            # pred_entropy.append(entropy)
-            # pred_prob.append(ans_prob)
             pred_s.append(s_idx)
             pred_e.append(e_idx)
             pred_score.append(scores_flat[idx_sort])
-        t2 = time.time()
-        logger.debug('answer decoding [time]: %.4f s' % (t2 - t1))
+        del score_s, score_e
         return pred_s, pred_e, pred_score
 
     @staticmethod
@@ -408,6 +464,7 @@ class DocReader(object):
                 pred_s.append(s_idx[idx_sort])
                 pred_e.append(e_idx[idx_sort])
                 pred_score.append(scores[idx_sort])
+        del score_s, score_e, candidates
         return pred_s, pred_e, pred_score
 
     # --------------------------------------------------------------------------
@@ -421,18 +478,20 @@ class DocReader(object):
         params = {
             'state_dict': state_dict,
             'word_dict': self.word_dict,
+            'char_dict': self.char_dict,
             'feature_dict': self.feature_dict,
             'args': self.args,
         }
         try:
             torch.save(params, filename)
-        except BaseException:
-            logger.warning('WARN: Saving failed... continuing anyway.')
+        except BaseException as e:
+            logger.warning(str(e) + 'WARN: Saving failed... continuing anyway.')
 
     def checkpoint(self, filename, epoch):
         params = {
             'state_dict': self.network.state_dict(),
             'word_dict': self.word_dict,
+            'char_dict': self.char_dict,
             'feature_dict': self.feature_dict,
             'args': self.args,
             'epoch': epoch,
@@ -440,14 +499,20 @@ class DocReader(object):
         }
         try:
             torch.save(params, filename)
-        except BaseException:
-            logger.warning('WARN: Saving failed... continuing anyway.')
+        except BaseException as e:
+            logger.warning(str(e) + 'WARN: Saving failed... continuing anyway.')
 
     @staticmethod
     def load(filename, new_args=None, normalize=True):
         logger.info('Loading model %s' % filename)
         saved_params = torch.load(filename, map_location=lambda storage, loc: storage)
         word_dict = saved_params['word_dict']
+        try:
+            char_dict = saved_params['char_dict']
+        except KeyError as e:
+            logger.info(str(e))
+            char_dict = Dictionary()
+
         feature_dict = saved_params['feature_dict']
         state_dict = saved_params['state_dict']
         args = saved_params['args']
@@ -456,7 +521,7 @@ class DocReader(object):
         # args.use_pos = True
         if new_args:
             args = override_model_args(args, new_args)
-        return DocReader(args, word_dict, feature_dict, state_dict, normalize)
+        return DocReader(args, word_dict, char_dict, feature_dict, state_dict, normalize)
 
     @staticmethod
     def load_checkpoint(filename, normalize=True):
@@ -465,12 +530,13 @@ class DocReader(object):
             filename, map_location=lambda storage, loc: storage
         )
         word_dict = saved_params['word_dict']
+        char_dict = saved_params['char_dict']
         feature_dict = saved_params['feature_dict']
         state_dict = saved_params['state_dict']
         epoch = saved_params['epoch']
         optimizer = saved_params['optimizer']
         args = saved_params['args']
-        model = DocReader(args, word_dict, feature_dict, state_dict, normalize)
+        model = DocReader(args, word_dict, char_dict, feature_dict, state_dict, normalize)
         model.init_optimizer(optimizer)
         return model, epoch
 

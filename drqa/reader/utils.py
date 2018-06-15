@@ -4,7 +4,7 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-"""DrQA reader utilities."""
+"""Reader utilities."""
 
 import json
 import logging
@@ -37,8 +37,10 @@ def load_data(args, filename, skip_no_answer=False):
         for ex in examples:
             if args.uncased_question:
                 ex['question'] = [w.lower() for w in ex['question']]
+                ex['question_char'] = [w.lower() for w in ex['question_char']]
             if args.uncased_doc:
                 ex['document'] = [w.lower() for w in ex['document']]
+                ex['document_char'] = [w.lower() for w in ex['document_char']]
 
     # Skip unparsed (start/end) examples
     if skip_no_answer:
@@ -115,13 +117,57 @@ def load_words(args, examples):
 
 
 def build_word_dict(args, examples):
-    """Return a dictionary from question and document words in
+    """Return a word dictionary from question and document words in
     provided examples.
     """
     word_dict = Dictionary()
     for w in load_words(args, examples):
         word_dict.add(w)
     return word_dict
+
+
+def index_embedding_chars(char_embedding_file):
+    """Put all the chars in char_embedding_file into a set."""
+    chars = set()
+    with open(char_embedding_file) as f:
+        for line in f:
+            c = Dictionary.normalize(line.rstrip().split(' ')[0])
+            chars.add(c)
+    return chars
+
+
+def load_chars(args, examples):
+    """Iterate and index all the chars in examples (documents + questions)."""
+
+    def _insert(iterable):
+        for c in iterable:
+            c = Dictionary.normalize(c)
+            if valid_chars and c not in valid_chars:
+                continue
+            chars.add(c)
+
+    if args.restrict_vocab and args.char_embedding_file:
+        logger.info('Restricting to chars in %s' % args.char_embedding_file)
+        valid_chars = index_embedding_chars(args.char_embedding_file)
+        logger.info('Num chars in set = %d' % len(valid_chars))
+    else:
+        valid_chars = None
+
+    chars = set()
+    for ex in examples:
+        _insert(ex['question_char'])
+        _insert(ex['document_char'])
+    return chars
+
+
+def build_char_dict(args, examples):
+    """Return a char dictionary from question and document words in
+    provided examples.
+    """
+    char_dict = Dictionary()
+    for c in load_chars(args, examples):
+        char_dict.add(c)
+    return char_dict
 
 
 def top_question_words(args, examples, word_dict):
@@ -145,11 +191,11 @@ def build_feature_dict(args, examples):
     feature_dict = {}
 
     # Exact match features
-    if args.use_in_question:
-        _insert('in_question')
-        _insert('in_question_uncased')
+    if args.use_exact_match:
+        _insert('in_cased')
+        _insert('in_uncased')
         if args.use_lemma:
-            _insert('in_question_lemma')
+            _insert('in_lemma')
 
     # Part of speech tag features
     if args.use_pos:

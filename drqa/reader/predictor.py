@@ -45,8 +45,8 @@ def tokenize(text):
 class Predictor(object):
     """Load a pretrained DocReader model and predict inputs on the fly."""
 
-    def __init__(self, model=None, tokenizer=None, normalize=True,
-                 embedding_file=None, num_workers=None):
+    def __init__(self, model, tokenizer=None, normalize=True,
+                 embedding_file=None, char_embedding_file=None, num_workers=None):
         """
         Args:
             model: path to saved model file.
@@ -57,14 +57,18 @@ class Predictor(object):
             num_workers: number of CPU processes to use to preprocess batches.
         """
         logger.info('Initializing model...')
-        self.model = DocReader.load(model or DEFAULTS['model'],
-                                    normalize=normalize)
+        self.model = DocReader.load(model or DEFAULTS['model'], normalize=normalize)
 
         if embedding_file:
             logger.info('Expanding dictionary...')
             words = utils.index_embedding_words(embedding_file)
-            added = self.model.expand_dictionary(words)
-            self.model.load_embeddings(added, embedding_file)
+            added_words = self.model.expand_dictionary(words)
+            self.model.load_embeddings(added_words, embedding_file)
+        if char_embedding_file:
+            logger.info('Expanding dictionary...')
+            chars = utils.index_embedding_chars(char_embedding_file)
+            added_chars = self.model.expand_char_dictionary(chars)
+            self.model.load_char_embeddings(added_chars, char_embedding_file)
 
         logger.info('Initializing tokenizer...')
         annotators = tokenizers.get_annotators_for_model(self.model)
@@ -100,28 +104,32 @@ class Predictor(object):
         # Tokenize the inputs, perhaps multi-processed.
         if self.workers:
             q_tokens = self.workers.map_async(tokenize, questions)
-            d_tokens = self.workers.map_async(tokenize, documents)
+            c_tokens = self.workers.map_async(tokenize, documents)
             q_tokens = list(q_tokens.get())
-            d_tokens = list(d_tokens.get())
+            c_tokens = list(c_tokens.get())
         else:
             q_tokens = list(map(self.tokenizer.tokenize, questions))
-            d_tokens = list(map(self.tokenizer.tokenize, documents))
+            c_tokens = list(map(self.tokenizer.tokenize, documents))
 
         examples = []
         for i in range(len(questions)):
             examples.append({
                 'id': i,
                 'question': q_tokens[i].words(),
+                'question_char': q_tokens[i].chars(),
                 'qlemma': q_tokens[i].lemmas(),
-                'document': d_tokens[i].words(),
-                'lemma': d_tokens[i].lemmas(),
-                'pos': d_tokens[i].pos(),
-                'ner': d_tokens[i].entities(),
+                'qpos': q_tokens[i].pos(),
+                'qner': q_tokens[i].entities(),
+                'document': c_tokens[i].words(),
+                'document_char': c_tokens[i].chars(),
+                'clemma': c_tokens[i].lemmas(),
+                'cpos': c_tokens[i].pos(),
+                'cner': c_tokens[i].entities(),
             })
 
         # Stick document tokens in candidates for decoding
         if candidates:
-            candidates = [{'input': d_tokens[i], 'cands': candidates[i]}
+            candidates = [{'input': c_tokens[i], 'cands': candidates[i]}
                           for i in range(len(candidates))]
 
         # Build the batch and run it through the model
@@ -133,7 +141,7 @@ class Predictor(object):
         for i in range(len(s)):
             predictions = []
             for j in range(len(s[i])):
-                span = d_tokens[i].slice(s[i][j], e[i][j] + 1).untokenize()
+                span = c_tokens[i].slice(s[i][j], e[i][j] + 1).untokenize()
                 predictions.append((span, score[i][j]))
             results.append(predictions)
         return results

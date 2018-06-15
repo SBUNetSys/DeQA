@@ -4,15 +4,14 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-"""Main DrQA reader training script."""
-
+"""Main reader training script."""
 import argparse
-import torch
+import glob
 import numpy as np
+import torch
 import json
 import os
 import sys
-import subprocess
 import logging
 
 from drqa.reader import utils, vector, config, data
@@ -28,7 +27,7 @@ logger = logging.getLogger()
 
 # Defaults
 DATA_DIR = os.path.join(DRQA_DATA, 'datasets')
-MODEL_DIR = '/tmp/drqa-models/'
+MODEL_DIR = os.path.join(DRQA_DATA, 'models')
 EMBED_DIR = os.path.join(DRQA_DATA, 'embeddings')
 
 
@@ -55,11 +54,11 @@ def add_train_args(parser):
     runtime.add_argument('--random-seed', type=int, default=1013,
                          help=('Random seed for all numpy/torch/cuda '
                                'operations (for reproducibility)'))
-    runtime.add_argument('--num-epochs', type=int, default=40,
+    runtime.add_argument('--num-epochs', type=int, default=80,
                          help='Train data iterations')
-    runtime.add_argument('--batch-size', type=int, default=32,
+    runtime.add_argument('--batch-size', type=int, default=48,
                          help='Batch size for training')
-    runtime.add_argument('--test-batch-size', type=int, default=128,
+    runtime.add_argument('--test-batch-size', type=int, default=64,
                          help='Batch size during validation/testing')
 
     # Files
@@ -84,16 +83,22 @@ def add_train_args(parser):
     files.add_argument('--embedding-file', type=str,
                        default='glove.840B.300d.txt',
                        help='Space-separated pretrained embeddings file')
+    files.add_argument('--char-embedding-file', type=str,
+                       default='glove.840B.300d-char.txt',
+                       help='Space-separated pretrained embeddings file')
 
     # Saving + loading
     save_load = parser.add_argument_group('Saving/Loading')
-    save_load.add_argument('--checkpoint', type='bool', default=False,
+    save_load.add_argument('--checkpoint', type='bool', default=True,
                            help='Save model + optimizer state after each epoch')
     save_load.add_argument('--pretrained', type=str, default='',
                            help='Path to a pretrained model to warm-start with')
     save_load.add_argument('--expand-dictionary', type='bool', default=False,
                            help='Expand dictionary of pretrained model to ' +
                                 'include training/dev words of new data')
+    save_load.add_argument('--early-stop', type=int, default=10,
+                           help='Checkpoints for early stop')
+
     # Data preprocessing
     preprocess = parser.add_argument_group('Preprocessing')
     preprocess.add_argument('--uncased-question', type='bool', default=False,
@@ -107,8 +112,8 @@ def add_train_args(parser):
     general = parser.add_argument_group('General')
     general.add_argument('--official-eval', type='bool', default=True,
                          help='Validate with official SQuAD eval')
-    general.add_argument('--valid-metric', type=str, default='f1',
-                         help='The evaluation metric used for model selection')
+    general.add_argument('--valid-metric', type=str, default='exact_match',
+                         help='The evaluation metric used for model selection: None, exact_match, f1')
     general.add_argument('--display-iter', type=int, default=25,
                          help='Log state after every <display_iter> epochs')
     general.add_argument('--sort-by-len', type='bool', default=True,
@@ -131,15 +136,19 @@ def set_defaults(args):
         args.embedding_file = os.path.join(args.embed_dir, args.embedding_file)
         if not os.path.isfile(args.embedding_file):
             raise IOError('No such file: %s' % args.embedding_file)
+    if args.char_embedding_file:
+        args.char_embedding_file = os.path.join(args.embed_dir, args.char_embedding_file)
+        if not os.path.isfile(args.char_embedding_file):
+            raise IOError('No such file: %s' % args.char_embedding_file)
 
     # Set model directory
-    subprocess.call(['mkdir', '-p', args.model_dir])
+    os.makedirs(args.model_dir, exist_ok=True)
 
     # Set model name
     if not args.model_name:
         import uuid
         import time
-        args.model_name = args.rnn_type + time.strftime("%Y%m%d-") + str(uuid.uuid4())[:8]
+        args.model_name = time.strftime("%Y%m%d-") + str(uuid.uuid4())[:8]
 
     # Set log + model file names
     args.log_file = os.path.join(args.model_dir, args.model_name + '.txt')
@@ -147,12 +156,18 @@ def set_defaults(args):
 
     # Embeddings options
     if args.embedding_file:
-        with open(args.embedding_file, encoding="utf-8") as f:
-            next(f)  # handle fasttext format correctly
+        with open(args.embedding_file) as f:
             dim = len(f.readline().strip().split(' ')) - 1
         args.embedding_dim = dim
     elif not args.embedding_dim:
         raise RuntimeError('Either embedding_file or embedding_dim '
+                           'needs to be specified.')
+    if args.char_embedding_file:
+        with open(args.char_embedding_file) as f:
+            dim = len(f.readline().strip().split(' ')) - 1
+        args.char_embedding_dim = dim
+    elif not args.char_embedding_dim:
+        raise RuntimeError('Either char_embedding_file or char_embedding_dim '
                            'needs to be specified.')
 
     # Make sure tune_partial and fix_embeddings are consistent.
@@ -183,18 +198,25 @@ def init_from_scratch(args, train_exs, dev_exs):
     logger.info('Num features = %d' % len(feature_dict))
     logger.info(feature_dict)
 
-    # Build a dictionary from the data questions + words (train/dev splits)
+    # Build a dictionary from the data questions + documents (train/dev splits)
     logger.info('-' * 100)
-    logger.info('Build dictionary')
+    logger.info('Build word dictionary')
     word_dict = utils.build_word_dict(args, train_exs + dev_exs)
     logger.info('Num words = %d' % len(word_dict))
 
+    # Build a char dictionary from the data questions + documents (train/dev splits)
+    logger.info('-' * 100)
+    logger.info('Build char dictionary')
+    char_dict = utils.build_char_dict(args, train_exs + dev_exs)
+    logger.info('Num chars = %d' % len(char_dict))
     # Initialize model
-    model = DocReader(config.get_model_args(args), word_dict, feature_dict)
+    model = DocReader(config.get_model_args(args), word_dict, char_dict, feature_dict)
 
     # Load pretrained embeddings for words in dictionary
     if args.embedding_file:
         model.load_embeddings(word_dict.tokens(), args.embedding_file)
+    if args.char_embedding_file:
+        model.load_char_embeddings(char_dict.tokens(), args.char_embedding_file)
 
     return model
 
@@ -263,7 +285,7 @@ def validate_unofficial(args, data_loader, model, global_stats, mode):
         if mode == 'train' and examples >= 1e4:
             break
 
-    logger.info('%s valid unofficial: Epoch = %d | start = %.2f | ' %
+    logger.info('eval: %s unofficial, epoch = %d | start = %.2f | ' %
                 (mode, global_stats['epoch'], start_acc.avg) +
                 'end = %.2f | exact = %.2f | examples = %d | ' %
                 (end_acc.avg, exact_match.avg, examples) +
@@ -306,7 +328,7 @@ def validate_official(args, data_loader, model, global_stats,
 
         examples += batch_size
 
-    logger.info('dev valid official: Epoch = %d | EM = %.2f | ' %
+    logger.info('eval: dev official, epoch = %d | EM = %.2f | ' %
                 (global_stats['epoch'], exact_match.avg * 100) +
                 'F1 = %.2f | examples = %d | valid time = %.2f (s)' %
                 (f1.avg * 100, examples, eval_time.time()))
@@ -343,7 +365,7 @@ def eval_accuracies(pred_s, target_s, pred_e, target_e):
 
         # Both start and end match
         if any([1 for _s, _e in zip(target_s[i], target_e[i])
-                if _s == pred_s[i] and _e == pred_e[i]]):
+                if int(_s) == int(pred_s[i]) and int(_e) == int(pred_e[i])]):
             em.update(1)
         else:
             em.update(0)
@@ -372,6 +394,10 @@ def main(args):
         dev_texts = utils.load_text(args.dev_json)
         dev_offsets = {ex['id']: ex['offsets'] for ex in dev_exs}
         dev_answers = utils.load_answers(args.dev_json)
+    else:
+        dev_texts = None
+        dev_offsets = None
+        dev_answers = None
 
     # --------------------------------------------------------------------------
     # MODEL
@@ -392,10 +418,18 @@ def main(args):
                 logger.info('Expanding dictionary for new data...')
                 # Add words in training + dev examples
                 words = utils.load_words(args, train_exs + dev_exs)
-                added = model.expand_dictionary(words)
+                added_words = model.expand_dictionary(words)
                 # Load pretrained embeddings for added words
                 if args.embedding_file:
-                    model.load_embeddings(added, args.embedding_file)
+                    model.load_embeddings(added_words, args.embedding_file)
+
+                logger.info('Expanding char dictionary for new data...')
+                # Add words in training + dev examples
+                chars = utils.load_chars(args, train_exs + dev_exs)
+                added_chars = model.expand_char_dictionary(chars)
+                # Load pretrained embeddings for added words
+                if args.char_embedding_file:
+                    model.load_char_embeddings(added_chars, args.char_embedding_file)
 
         else:
             logger.info('Training model from scratch...')
@@ -474,6 +508,10 @@ def main(args):
     logger.info('-' * 100)
     logger.info('Starting training...')
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
+    model_prefix = os.path.join(args.model_dir, args.model_name)
+
+    kept_models = []
+    best_model_path = ''
     for epoch in range(start_epoch, args.num_epochs):
         stats['epoch'] = epoch
 
@@ -481,31 +519,53 @@ def main(args):
         train(args, train_loader, model, stats)
 
         # Validate unofficial (train)
+        logger.info('eval: train split unofficially...')
         validate_unofficial(args, train_loader, model, stats, mode='train')
 
-        # Validate unofficial (dev)
-        result = validate_unofficial(args, dev_loader, model, stats, mode='dev')
-
-        # Validate official
         if args.official_eval:
+            # Validate official (dev)
+            logger.info('eval: dev split unofficially..')
             result = validate_official(args, dev_loader, model, stats,
                                        dev_offsets, dev_texts, dev_answers)
+        else:
+            # Validate unofficial (dev)
+            logger.info('train: evaluating dev split evaluating dev official...')
+            result = validate_unofficial(args, dev_loader, model, stats, mode='dev')
 
+        em = result['exact_match']
+        f1 = result['f1']
+        suffix = 'em_{:4.2f}-f1_{:4.2f}.mdl'.format(em, f1)
         # Save best valid
-        if result[args.valid_metric] > stats['best_valid']:
-            logger.info('Best valid: %s = %.2f (epoch %d, %d updates)' %
-                        (args.valid_metric, result[args.valid_metric],
-                         stats['epoch'], model.updates))
-            model.save(args.model_file)
-            stats['best_valid'] = result[args.valid_metric]
+        model_file = '{}-epoch_{}-{}'.format(model_prefix, epoch, suffix)
+        if args.valid_metric:
+            if result[args.valid_metric] > stats['best_valid']:
+                for f in glob.glob('{}-best*'.format(model_prefix)):
+                    os.remove(f)
+                logger.info('eval: dev best %s = %.2f (epoch %d, %d updates)' %
+                            (args.valid_metric, result[args.valid_metric],
+                             stats['epoch'], model.updates))
+                model_file = '{}-best-epoch_{}-{}'.format(model_prefix, epoch, suffix)
+                best_model_path = model_file
+                model.save(model_file)
+                stats['best_valid'] = result[args.valid_metric]
+                for f in kept_models:
+                    os.remove(f)
+                kept_models.clear()
+            else:
+                model.save(model_file)
+                kept_models.append(model_file)
+                if len(kept_models) >= args.early_stop:
+                    logger.info('Finished training due to %s not improved for %d epochs, best model is at: %s' %
+                                (args.valid_metric, args.early_stop, best_model_path))
+                    return
+        else:
+            # just save model every epoch since no validation metric is given
+            model.save(model_file)
 
 
 if __name__ == '__main__':
     # Parse cmdline args and setup environment
-    parser = argparse.ArgumentParser(
-        'DrQA Document Reader',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser('Document Reader', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     add_train_args(parser)
     config.add_model_args(parser)
     args = parser.parse_args()

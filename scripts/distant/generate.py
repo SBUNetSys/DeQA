@@ -143,13 +143,15 @@ def find_answer(paragraph, q_tokens, answer, opts):
                     best_ex = {
                         'id': uuid.uuid4().hex,
                         'question': q_tokens.words(),
+                        'question_char': q_tokens.chars(),
                         'document': p_tokens.words(),
+                        'document_char': p_tokens.chars(),
                         'offsets': p_tokens.offsets(),
                         'answers': [(idx, idx + len(a_words) - 1)],
-                        'qlemma': q_tokens.lemmas(),
-                        'lemma': p_tokens.lemmas(),
-                        'pos': p_tokens.pos(),
-                        'ner': p_tokens.entities(),
+                        # 'qlemma': q_tokens.lemmas(),
+                        # 'lemma': p_tokens.lemmas(),
+                        # 'pos': p_tokens.pos(),
+                        # 'ner': p_tokens.entities(),
                     }
     if best_score >= opts['match_threshold']:
         return best_score, best_ex

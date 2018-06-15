@@ -4,7 +4,7 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-"""Model architecture/optimization options for DrQA document reader."""
+"""Model architecture/optimization options for document reader."""
 
 import argparse
 import logging
@@ -13,16 +13,16 @@ logger = logging.getLogger(__name__)
 
 # Index of arguments concerning the core model architecture
 MODEL_ARCHITECTURE = {
-    'model_type', 'embedding_dim', 'hidden_size', 'doc_layers',
-    'question_layers', 'rnn_type', 'concat_rnn_layers', 'question_merge',
-    'use_qemb', 'use_in_question', 'use_pos', 'use_ner', 'use_lemma', 'use_tf'
+    'model_type', 'embedding_dim', 'char_embedding_dim', 'hidden_size', 'char_hidden_size',
+    'doc_layers', 'question_layers', 'rnn_type', 'concat_rnn_layers', 'question_merge',
+    'use_qemb', 'use_exact_match', 'use_pos', 'use_ner', 'use_lemma', 'use_tf', 'hop'
 }
 
 # Index of arguments concerning the model optimizer/training
 MODEL_OPTIMIZER = {
     'fix_embeddings', 'optimizer', 'learning_rate', 'momentum', 'weight_decay',
-    'rnn_padding', 'dropout_rnn', 'dropout_rnn_output', 'dropout_emb',
-    'max_len', 'grad_clipping', 'tune_partial'
+    'rho', 'eps', 'max_len', 'grad_clipping', 'tune_partial',
+    'rnn_padding', 'dropout_rnn', 'dropout_rnn_output', 'dropout_emb'
 }
 
 
@@ -34,13 +34,17 @@ def add_model_args(parser):
     parser.register('type', 'bool', str2bool)
 
     # Model architecture
-    model = parser.add_argument_group('DrQA Reader Model Architecture')
-    model.add_argument('--model-type', type=str, default='rnn',
-                       help='Model architecture type')
+    model = parser.add_argument_group('Reader Model Architecture')
+    model.add_argument('--model-type', type=str, default='mnemonic',
+                       help='Model architecture type: drqa, r-net, mnemonic')
     model.add_argument('--embedding-dim', type=int, default=300,
                        help='Embedding size if embedding_file is not given')
+    model.add_argument('--char-embedding-dim', type=int, default=8,
+                       help='Embedding size if char_embedding_file is not given')
     model.add_argument('--hidden-size', type=int, default=128,
                        help='Hidden size of RNN units')
+    model.add_argument('--char-hidden-size', type=int, default=64,
+                       help='Hidden size of char RNN units')
     model.add_argument('--doc-layers', type=int, default=3,
                        help='Number of encoding layers for document')
     model.add_argument('--question-layers', type=int, default=3,
@@ -49,14 +53,14 @@ def add_model_args(parser):
                        help='RNN type: LSTM, GRU, or RNN')
 
     # Model specific details
-    detail = parser.add_argument_group('DrQA Reader Model Details')
+    detail = parser.add_argument_group('Reader Model Details')
     detail.add_argument('--concat-rnn-layers', type='bool', default=True,
                         help='Combine hidden states from each encoding layer')
     detail.add_argument('--question-merge', type=str, default='self_attn',
                         help='The way of computing the question representation')
     detail.add_argument('--use-qemb', type='bool', default=True,
                         help='Whether to use weighted question embeddings')
-    detail.add_argument('--use-in-question', type='bool', default=True,
+    detail.add_argument('--use-exact-match', type='bool', default=True,
                         help='Whether to use in_question_* features')
     detail.add_argument('--use-pos', type='bool', default=False,
                         help='Whether to use pos features')
@@ -66,25 +70,31 @@ def add_model_args(parser):
                         help='Whether to use lemma features')
     detail.add_argument('--use-tf', type='bool', default=True,
                         help='Whether to use term frequency features')
+    detail.add_argument('--hop', type=int, default=2,
+                        help='The number of hops for both aligner and the answer pointer in m-reader')
 
     # Optimization details
-    optim = parser.add_argument_group('DrQA Reader Optimization')
-    optim.add_argument('--dropout-emb', type=float, default=0.4,
+    optim = parser.add_argument_group('Reader Optimization')
+    optim.add_argument('--dropout-emb', type=float, default=0.3,
                        help='Dropout rate for word embeddings')
-    optim.add_argument('--dropout-rnn', type=float, default=0.4,
+    optim.add_argument('--dropout-rnn', type=float, default=0.3,
                        help='Dropout rate for RNN states')
     optim.add_argument('--dropout-rnn-output', type='bool', default=True,
                        help='Whether to dropout the RNN output')
     optim.add_argument('--optimizer', type=str, default='adamax',
-                       help='Optimizer: sgd or adamax')
-    optim.add_argument('--learning-rate', type=float, default=0.001,
-                       help='Learning rate for SGD only')
+                       help='Optimizer: sgd, adamax, adadelta')
+    optim.add_argument('--learning-rate', type=float, default=1.0,
+                       help='Learning rate for sgd, adadelta')
     optim.add_argument('--grad-clipping', type=float, default=10,
                        help='Gradient clipping')
     optim.add_argument('--weight-decay', type=float, default=0,
                        help='Weight decay factor')
     optim.add_argument('--momentum', type=float, default=0,
                        help='Momentum factor')
+    optim.add_argument('--rho', type=float, default=0.95,
+                       help='Rho for adadelta')
+    optim.add_argument('--eps', type=float, default=1e-6,
+                       help='Eps for adadelta')
     optim.add_argument('--fix-embeddings', type='bool', default=True,
                        help='Keep word embeddings fixed (use pretrained)')
     optim.add_argument('--tune-partial', type=int, default=0,

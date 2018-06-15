@@ -89,13 +89,13 @@ class RnnDocReader(nn.Module):
             normalize=normalize,
         )
 
-    def forward(self, x1, x1_f, x1_mask, x2, x2_mask):
+    def forward(self, x1, x1_c, x1_f, x1_mask, x2, x2_c, x2_mask):
         """Inputs:
         x1 = document word indices             [batch * len_d]
-        x1_f = document word features indices  [batch * len_d * nfeat]
         x1_mask = document padding mask        [batch * len_d]
         x2 = question word indices             [batch * len_q]
         x2_mask = question padding mask        [batch * len_q]
+        x1_f = document word features indices  [batch * len_d * nfeat]
         """
         # Embed both document and question
         t1 = time.time()

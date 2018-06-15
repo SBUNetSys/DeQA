@@ -12,11 +12,12 @@ import copy
 class Tokens(object):
     """A class to represent a list of tokenized text."""
     TEXT = 0
-    TEXT_WS = 1
-    SPAN = 2
-    POS = 3
-    LEMMA = 4
-    NER = 5
+    CHAR = 1
+    TEXT_WS = 2
+    SPAN = 3
+    POS = 4
+    LEMMA = 5
+    NER = 6
 
     def __init__(self, data, annotators, opts=None):
         self.data = data
@@ -36,6 +37,17 @@ class Tokens(object):
     def untokenize(self):
         """Returns the original text (with whitespace reinserted)."""
         return ''.join([t[self.TEXT_WS] for t in self.data]).strip()
+
+    def chars(self, uncased=False):
+        """Returns a list of the first character of each token
+
+        Args:
+            uncased: lower cases characters
+        """
+        if uncased:
+            return [t[self.CHAR].lower() for t in self.data]
+        else:
+            return [t[self.CHAR] for t in self.data]
 
     def words(self, uncased=False):
         """Returns a list of the text of each token
