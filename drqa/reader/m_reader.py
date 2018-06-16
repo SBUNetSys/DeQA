@@ -48,7 +48,7 @@ class MnemonicReader(nn.Module):
             padding=args.rnn_padding,
         )
 
-        doc_input_size = args.embedding_dim + args.char_hidden_size * 2 + args.num_features
+        doc_input_size = args.embedding_dim + args.char_hidden_size * 2  # + args.num_features
 
         # Encoder
         self.encoding_rnn = layers.StackedBRNN(
@@ -132,9 +132,10 @@ class MnemonicReader(nn.Module):
         crnn_input = [x1_emb, x1_c_features]
         qrnn_input = [x2_emb, x2_c_features]
         # Add manual features
-        if self.args.num_features > 0:
-            crnn_input.append(x1_f)
-            # qrnn_input.append(x2_f)
+        #     FIXME: use document and question features
+        # if self.args.num_features > 0:
+        #     crnn_input.append(x1_f)
+        #     qrnn_input.append(x1_f)
 
         # Encode document with RNN
         c = self.encoding_rnn(torch.cat(crnn_input, 2), x1_mask)
