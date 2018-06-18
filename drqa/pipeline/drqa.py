@@ -264,9 +264,11 @@ class DrQA(object):
                             'question': q_text,
                             'qlemma': q_tokens[qidx].lemmas(),
                             'document': para_text,
-                            'lemma': s_tokens[sidx].lemmas(),
-                            'pos': s_tokens[sidx].pos(),
-                            'ner': s_tokens[sidx].entities(),
+                            'document_char': s_tokens[sidx].chars(),
+                            'question_char': q_tokens[qidx].chars(),
+                            # 'lemma': s_tokens[sidx].lemmas(),
+                            # 'pos': s_tokens[sidx].pos(),
+                            # 'ner': s_tokens[sidx].entities(),
                             'doc_score': float(all_doc_scores[qidx][rel_didx])
                         })
                         # r = {'w': para_text}
