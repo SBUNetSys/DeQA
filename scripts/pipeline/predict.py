@@ -27,11 +27,10 @@ logger.addHandler(console)
 parser = argparse.ArgumentParser()
 parser.add_argument('dataset', type=str)
 parser.add_argument('--out-dir', type=str, default=None,
+                    help="Directory to write prediction file")
+parser.add_argument('--out-suffix', type=str, default=None,
                     help=("Directory to write prediction file to "
-                          "(<dataset>-<model>-pipeline.preds)"))
-parser.add_argument('--out-suffix', type=str, default='.predictions.txt',
-                    help=("Directory to write prediction file to "
-                          "(<dataset>-<model>-pipeline.preds)"))
+                          "(<dataset>-<model>.predictions.txt)"))
 parser.add_argument('--reader-model', type=str, default=None,
                     help="Path to trained Document Reader model")
 parser.add_argument('--retriever-model', type=str, default=None,
@@ -109,11 +108,11 @@ for line in open(args.dataset):
     data = json.loads(line)
     queries.append(data['question'])
 
-model = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
-basename = os.path.splitext(os.path.basename(args.dataset))[0]
+model_name = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
+data_name = os.path.splitext(os.path.basename(args.dataset))[0]
 out_dir = args.out_dir or os.path.dirname(args.dataset)
 os.makedirs(out_dir, exist_ok=True)
-outfile = os.path.join(out_dir, basename + args.out_suffix)
+outfile = os.path.join(out_dir, args.out_suffix or '{}-{}.predictions.txt'.format(data_name, model_name))
 
 logger.info('Writing results to %s' % outfile)
 with open(outfile, 'w') as f:
