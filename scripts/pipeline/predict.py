@@ -26,7 +26,10 @@ logger.addHandler(console)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('dataset', type=str)
-parser.add_argument('--out-suffix', type=str, default='.preds',
+parser.add_argument('--out-dir', type=str, default=None,
+                    help=("Directory to write prediction file to "
+                          "(<dataset>-<model>-pipeline.preds)"))
+parser.add_argument('--out-suffix', type=str, default='.predictions.txt',
                     help=("Directory to write prediction file to "
                           "(<dataset>-<model>-pipeline.preds)"))
 parser.add_argument('--reader-model', type=str, default=None,
@@ -63,10 +66,10 @@ if args.verbose:
     logger.setLevel(logging.DEBUG)
 
 t0 = time.time()
-log_filename = ('_'.join(sys.argv) + time.strftime("%Y%m%d-%H%M%S")).replace('/', '_')
-logfile = logging.FileHandler('/tmp/%s.log' % log_filename, 'w')
-logfile.setFormatter(fmt)
-logger.addHandler(logfile)
+# log_filename = ('_'.join(sys.argv) + time.strftime("%Y%m%d-%H%M%S")).replace('/', '_')
+# logfile = logging.FileHandler('/tmp/%s.log' % log_filename, 'w')
+# logfile.setFormatter(fmt)
+# logger.addHandler(logfile)
 logger.info('COMMAND: python %s' % ' '.join(sys.argv))
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -76,9 +79,7 @@ if args.cuda:
 else:
     logger.info('Running on CPU only.')
 
-if args.ranker.lower().startswith('g'):
-    ranker = retriever.get_class('galago')(use_keyword=args.use_keyword, index_path=args.db_path)
-elif args.ranker.lower().startswith('s'):
+if args.ranker.lower().startswith('s'):
     ranker = retriever.get_class('sql')(db_path=args.db_path)
 elif args.ranker.lower().startswith('l'):
     ranker = retriever.get_class('lucene')(index_path=args.db_path)
@@ -110,8 +111,9 @@ for line in open(args.dataset):
 
 model = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
 basename = os.path.splitext(os.path.basename(args.dataset))[0]
-out_dir = os.path.dirname(args.dataset)
-outfile = os.path.join(out_dir, basename + '-' + args.out_suffix)
+out_dir = args.out_dir or os.path.dirname(args.dataset)
+os.makedirs(out_dir, exist_ok=True)
+outfile = os.path.join(out_dir, basename + args.out_suffix)
 
 logger.info('Writing results to %s' % outfile)
 with open(outfile, 'w') as f:
