@@ -62,6 +62,7 @@ class DrQA(object):
     def __init__(
             self,
             reader_model=None,
+            normalize=False,
             embedding_file=None,
             tokenizer=None,
             fixed_candidates=None,
@@ -101,7 +102,7 @@ class DrQA(object):
         logger.info('Initializing document reader...')
         t0 = time.time()
         reader_model = reader_model or DEFAULTS['reader_model']
-        self.reader = reader.DocReader.load(reader_model, normalize=False)
+        self.reader = reader.DocReader.load(reader_model, normalize=normalize)
         t1 = time.time()
         logger.info('document reader model load [time]: %.4f s' % (t1 - t0))
 

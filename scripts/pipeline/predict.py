@@ -33,6 +33,7 @@ parser.add_argument('--out-suffix', type=str, default=None,
                           "(<dataset>-<model>.predictions.txt)"))
 parser.add_argument('--reader-model', type=str, default=None,
                     help="Path to trained Document Reader model")
+parser.add_argument('--normalize', action='store_true', help="Use normalized answer score")
 parser.add_argument('--retriever-model', type=str, default=None,
                     help="Path to Document Retriever model (tfidf)")
 parser.add_argument('--db_path', type=str, default=None,
@@ -88,6 +89,7 @@ else:
 logger.info('Initializing pipeline...')
 DrQA = pipeline.DrQA(
     reader_model=args.reader_model,
+    normalize=args.normalize,
     tokenizer=args.tokenizer,
     batch_size=args.batch_size,
     cuda=args.cuda,
