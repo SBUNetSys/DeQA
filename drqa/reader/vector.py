@@ -71,7 +71,7 @@ def vectorize(ex, model, single_answer=False):
             features[i][feature_dict['tf']] = counter[w.lower()] * 1.0 / l
 
     t2 = time.time()
-    logger.debug('vectorize [time]: %.4f s' % (t2 - t1))
+    # logger.debug('vectorize [time]: %.4f s' % (t2 - t1))
     # Maybe return without target
     if 'answers' not in ex:
         return document, document_char, features, question, question_char, ex['id']
@@ -131,7 +131,7 @@ def batchify(batch):
         x2_c[i, :c.size(0)].copy_(c)
 
     t2 = time.time()
-    logger.debug('batchify [time]: %.4f s' % (t2 - t1))
+    # logger.debug('batchify [time]: %.4f s' % (t2 - t1))
     # Maybe return without targets
     if len(batch[0]) == NUM_INPUTS + NUM_EXTRA:
         return x1, x1_c, x1_f, x1_mask, x2, x2_c, x2_mask, ids

@@ -237,7 +237,7 @@ class DrQA(object):
                 flat_splits.append(split)
             didx2sidx[-1][1] = len(flat_splits)
         t5 = time.time()
-        logger.debug('doc_texts flattened')
+        # logger.debug('doc_texts flattened')
 
         # Push through the tokenizers as fast as possible.
         q_tokens = self.processes.map_async(tokenize_text, queries)
@@ -278,7 +278,7 @@ class DrQA(object):
                         # f.close()
                         # exit(0)
                         para_lens.append(len(s_tokens[sidx].words()))
-            logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
+            # logger.debug('question_p: %s paragraphs: %s' % (queries[qidx], para_lens))
         t7 = time.time()
         logger.info('paragraphs prepared [time]: %.4f s' % (t7 - t6))
 

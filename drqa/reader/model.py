@@ -15,7 +15,7 @@ import copy
 import time
 from torch.autograd import Variable
 from .config import override_model_args
-from .r_net import R_Net
+from .r_net import RNet
 from .rnn_reader import RnnDocReader
 from .m_reader import MnemonicReader
 from .data import Dictionary
@@ -51,7 +51,7 @@ class DocReader(object):
         if args.model_type == 'drqa':
             self.network = RnnDocReader(args, normalize)
         elif args.model_type == 'rnet':
-            self.network = R_Net(args, normalize)
+            self.network = RNet(args, normalize)
         elif args.model_type == 'mnemonic':
             self.network = MnemonicReader(args, normalize)
         else:

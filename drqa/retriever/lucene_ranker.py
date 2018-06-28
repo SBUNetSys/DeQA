@@ -63,8 +63,8 @@ class LuceneRanker(object):
             doc_scores.append(doc_score)
             doc_texts.append(text)
             # print('id:', doc_id, 'ds:', doc_score, 'text:', text)
-        logger.debug('question_d:%s, query:%s, doc_ids:%s, doc_scores:%s'
-                     % (question_, query, doc_ids, doc_scores))
+        # logger.debug('question_d:%s, query:%s, doc_ids:%s, doc_scores:%s'
+        #              % (question_, query, doc_ids, doc_scores))
         return doc_ids, doc_scores, doc_texts
 
     def batch_closest_docs(self, queries, k=5, num_workers=None):

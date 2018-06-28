@@ -10,6 +10,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from . import layers
+import logging
+import time
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------------------
@@ -112,10 +115,13 @@ class MnemonicReader(nn.Module):
         x2_mask = question padding mask        [batch * len_q]
         """
         # Embed both document and question
+        t_start = time.time()
         x1_emb = self.embedding(x1)
         x2_emb = self.embedding(x2)
         x1_c_emb = self.char_embedding(x1_c)
         x2_c_emb = self.char_embedding(x2_c)
+        logger.debug('embedding lookup [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Dropout on embeddings
         if self.args.dropout_emb > 0:
@@ -126,7 +132,12 @@ class MnemonicReader(nn.Module):
 
         # Generate char features
         x1_c_features = self.char_rnn(x1_c_emb, x1_mask)
+        # logger.debug('document char rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        # t_start = time.time()
+
         x2_c_features = self.char_rnn(x2_c_emb, x2_mask)
+        logger.debug('char rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Combine input
         crnn_input = [x1_emb, x1_c_features]
@@ -139,9 +150,13 @@ class MnemonicReader(nn.Module):
 
         # Encode document with RNN
         c = self.encoding_rnn(torch.cat(crnn_input, 2), x1_mask)
+        logger.debug('document rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Encode question with RNN
         q = self.encoding_rnn(torch.cat(qrnn_input, 2), x2_mask)
+        logger.debug('question rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Align and aggregate
         c_check = c
@@ -152,8 +167,10 @@ class MnemonicReader(nn.Module):
             c_tilde = self.self_aligners[i].forward(c_bar, x1_mask)
             c_hat = self.self_SFUs[i].forward(c_bar, torch.cat([c_tilde, c_bar * c_tilde, c_bar - c_tilde], 2))
             c_check = self.aggregate_rnns[i].forward(c_hat, x1_mask)
-
+        logger.debug('align aggregate matmul [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
         # Predict
         start_scores, end_scores = self.mem_ans_ptr.forward(c_check, q, x1_mask, x2_mask)
+        logger.debug('mem_ans_ptr matmul [time]: %.4f s' % (time.time() - t_start))
 
         return start_scores, end_scores

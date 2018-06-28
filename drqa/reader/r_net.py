@@ -10,6 +10,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from . import layers
+import logging
+import time
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------------------
@@ -17,12 +20,12 @@ from . import layers
 # ------------------------------------------------------------------------------
 
 
-class R_Net(nn.Module):
+class RNet(nn.Module):
     RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN}
     CELL_TYPES = {'lstm': nn.LSTMCell, 'gru': nn.GRUCell, 'rnn': nn.RNNCell}
 
     def __init__(self, args, normalize=True):
-        super(R_Net, self).__init__()
+        super(RNet, self).__init__()
         # Store config
         self.args = args
 
@@ -132,10 +135,13 @@ class R_Net(nn.Module):
         x2_mask = question padding mask        [batch * len_q]
         """
         # Embed both document and question
+        t_start = time.time()
         x1_emb = self.embedding(x1)
         x2_emb = self.embedding(x2)
         x1_c_emb = self.char_embedding(x1_c)
         x2_c_emb = self.char_embedding(x2_c)
+        logger.debug('embedding lookup [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Dropout on embeddings
         if self.args.dropout_emb > 0:
@@ -146,7 +152,12 @@ class R_Net(nn.Module):
 
         # Generate char features
         x1_c_features = self.char_rnn(x1_c_emb, x1_mask)
+        # logger.debug('document char rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        # t_start = time.time()
+
         x2_c_features = self.char_rnn(x2_c_emb, x2_mask)
+        logger.debug('char rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Combine input
         crnn_input = [x1_emb, x1_c_features]
@@ -154,22 +165,47 @@ class R_Net(nn.Module):
 
         # Encode document with RNN
         c = self.encode_rnn(torch.cat(crnn_input, 2), x1_mask)
+        logger.debug('document rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Encode question with RNN
         q = self.encode_rnn(torch.cat(qrnn_input, 2), x2_mask)
+        logger.debug('question rnn encoding [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Match questions to docs
         question_attn_hiddens = self.question_attn(c, q, x2_mask)
+        # logger.debug('question_attn matmul [time]: %.4f s' % (time.time() - t_start))
+        # t_start = time.time()
+
         rnn_input = self.question_attn_gate(torch.cat([c, question_attn_hiddens], 2))
+        logger.debug('question_attn and gate matmul [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
+
         c = self.question_attn_rnn(rnn_input, x1_mask)
+
+        logger.debug('question_attn rnn [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Match documents to themselves
         doc_self_attn_hiddens = self.doc_self_attn(c, x1_mask)
+        # logger.debug('doc_self_attn matmul [time]: %.4f s' % (time.time() - t_start))
+        # t_start = time.time()
+
         rnn_input = self.doc_self_attn_gate(torch.cat([c, doc_self_attn_hiddens], 2))
+        logger.debug('doc_self_attn and gate matmul [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
+
         c = self.doc_self_attn_rnn(rnn_input, x1_mask)
+        # logger.debug('doc_self_attn rnn [time]: %.4f s' % (time.time() - t_start))
+        # t_start = time.time()
+
         c = self.doc_self_attn_rnn2(c, x1_mask)
+        logger.debug('doc_self_attn rnn [time]: %.4f s' % (time.time() - t_start))
+        t_start = time.time()
 
         # Predict
         start_scores, end_scores = self.ptr_net(c, q, x1_mask, x2_mask)
+        logger.debug('ptr_net matmul_seq_attn [time]: %.4f s' % (time.time() - t_start))
 
         return start_scores, end_scores
