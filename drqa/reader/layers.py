@@ -225,7 +225,7 @@ class PointerNetwork(nn.Module):
                 # ...Otherwise 0-1 probabilities
                 scores = F.softmax(s, dim=1)
         else:
-            scores = a.exp()
+            scores = s.exp()
         return res, scores
 
     def forward(self, x, y, x_mask, y_mask):
@@ -424,10 +424,10 @@ class BilinearSeqAttn(nn.Module):
         if self.normalize:
             if self.training:
                 # In training we output log-softmax for NLL
-                alpha = F.log_softmax(xWy)
+                alpha = F.log_softmax(xWy, dim=1)
             else:
                 # ...Otherwise 0-1 probabilities
-                alpha = F.softmax(xWy)
+                alpha = F.softmax(xWy, dim=1)
         else:
             alpha = xWy.exp()
         return alpha
@@ -454,7 +454,7 @@ class LinearSeqAttn(nn.Module):
         x_flat = x.view(-1, x.size(-1))
         scores = self.linear(x_flat).view(x.size(0), x.size(1))
         scores.data.masked_fill_(x_mask.data, -float('inf'))
-        alpha = F.softmax(scores)
+        alpha = F.softmax(scores, dim=1)
         return alpha
 
 
