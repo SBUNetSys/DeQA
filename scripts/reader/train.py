@@ -54,7 +54,7 @@ def add_train_args(parser):
     runtime.add_argument('--random-seed', type=int, default=1013,
                          help=('Random seed for all numpy/torch/cuda '
                                'operations (for reproducibility)'))
-    runtime.add_argument('--num-epochs', type=int, default=80,
+    runtime.add_argument('--num-epochs', type=int, default=200,
                          help='Train data iterations')
     runtime.add_argument('--batch-size', type=int, default=48,
                          help='Batch size for training')

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class MnemonicReader(nn.Module):
-    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN}
+    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN, 'sru': 'SRU'}
     CELL_TYPES = {'lstm': nn.LSTMCell, 'gru': nn.GRUCell, 'rnn': nn.RNNCell}
 
     def __init__(self, args, normalize=True):
