@@ -162,15 +162,23 @@ class MnemonicReader(nn.Module):
         c_check = c
         for i in range(self.args.hop):
             q_tilde = self.interactive_aligners[i].forward(c_check, q, x2_mask)
+            logger.debug('interactive_aligners [time]: %.4f s' % (time.time() - t_start))
+            t_start = time.time()
             c_bar = self.interactive_SFUs[i].forward(c_check,
                                                      torch.cat([q_tilde, c_check * q_tilde, c_check - q_tilde], 2))
+            logger.debug('interactive_SFUs [time]: %.4f s' % (time.time() - t_start))
+            t_start = time.time()
             c_tilde = self.self_aligners[i].forward(c_bar, x1_mask)
+            logger.debug('self_aligners [time]: %.4f s' % (time.time() - t_start))
+            t_start = time.time()
             c_hat = self.self_SFUs[i].forward(c_bar, torch.cat([c_tilde, c_bar * c_tilde, c_bar - c_tilde], 2))
+            logger.debug('self_SFUs [time]: %.4f s' % (time.time() - t_start))
+            t_start = time.time()
             c_check = self.aggregate_rnns[i].forward(c_hat, x1_mask)
-        logger.debug('align aggregate matmul [time]: %.4f s' % (time.time() - t_start))
-        t_start = time.time()
+            logger.debug('aggregate_rnns [time]: %.4f s' % (time.time() - t_start))
+            t_start = time.time()
         # Predict
         start_scores, end_scores = self.mem_ans_ptr.forward(c_check, q, x1_mask, x2_mask)
-        logger.debug('mem_ans_ptr matmul [time]: %.4f s' % (time.time() - t_start))
+        logger.debug('mem_ans_ptr [time]: %.4f s' % (time.time() - t_start))
 
         return start_scores, end_scores
