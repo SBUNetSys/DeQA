@@ -266,13 +266,13 @@ class MemoryAnsPointer(nn.Module):
             z_s_ = z_s.repeat(1, x.size(1), 1)  # [B, S, I]
             s = self.FFNs_start[i](torch.cat([x, z_s_, x * z_s_], 2)).squeeze(2)
             s.data.masked_fill_(x_mask.data, -float('inf'))
-            p_s = F.softmax(s, dim=1)  # [B, S]
+            p_s = s.exp()
             u_s = p_s.unsqueeze(1).bmm(x)  # [B, 1, I]
             z_e = self.SFUs_start[i](z_s, u_s)  # [B, 1, I]
             z_e_ = z_e.repeat(1, x.size(1), 1)  # [B, S, I]
             e = self.FFNs_end[i](torch.cat([x, z_e_, x * z_e_], 2)).squeeze(2)
             e.data.masked_fill_(x_mask.data, -float('inf'))
-            p_e = F.softmax(e, dim=1)  # [B, S]
+            p_e = e.exp()
             u_e = p_e.unsqueeze(1).bmm(x)  # [B, 1, I]
             z_s = self.SFUs_end[i](z_e, u_e)
         if self.normalize:

@@ -71,7 +71,7 @@ def add_model_args(parser):
                         help='Whether to use lemma features')
     detail.add_argument('--use-tf', type='bool', default=True,
                         help='Whether to use term frequency features')
-    detail.add_argument('--hop', type=int, default=2,
+    detail.add_argument('--hop', type=int, default=1,
                         help='The number of hops for both aligner and the answer pointer in m-reader')
 
     # Optimization details
