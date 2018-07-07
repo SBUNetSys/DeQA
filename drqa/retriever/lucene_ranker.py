@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import argparse
 import logging
 import subprocess
 from multiprocessing.pool import ThreadPool
@@ -98,8 +98,13 @@ if __name__ == '__main__':
     console = logging.StreamHandler()
     console.setFormatter(fmt)
     logger.addHandler(console)
-    ranker = LuceneRanker()
-    question = 'What is Renaixença'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--lucene_path', type=str)
+    parser.add_argument('-i', '--lucene_index', type=str)
+    parser.add_argument('-q', '--question', type=str,  default='when is world war ii')
+    args = parser.parse_args()
+    ranker = LuceneRanker(args.lucene_path, args.lucene_index)
+    question = args.question
     ids, scores, texts = ranker.closest_docs(question, k=10)
     for doc_id, doc_score, doc_text in zip(ids, scores, texts):
         print(doc_id, doc_score, doc_text)
