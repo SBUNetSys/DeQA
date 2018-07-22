@@ -1,0 +1,3 @@
+py3.5 prepare_data_nw.py -p newdata/drqa-train.txt -a CuratedTrec-test_train.txt -nm -r drqa_records/ -f trec/
+py3.5 linear_model.py -r drqa_records/ -f feature_dir/
+py3.5 eval_model_nw.py -p newdata/drqa-val.txt -a CuratedTrec-test_val.txt -f feature_dir -m linear_model.mdl.train

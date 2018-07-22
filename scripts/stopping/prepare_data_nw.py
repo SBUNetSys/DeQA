@@ -80,7 +80,7 @@ def process_record(data_line_, prediction_line_, neg_gap_, feature_dir_, record_
         end = int(entry['end'])
         doc_score = entry['doc_score']
         ans_score = entry['span_score']
-        prob = entry['prob']
+        prob = entry['span_score']
         span = entry['span']
 
         if span in all_spans:
