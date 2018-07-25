@@ -1,3 +1,11 @@
-py3.5 prepare_data_nw.py -p newdata/drqa-train.txt -a CuratedTrec-test_train.txt -nm -r drqa_records/ -f trec/
-py3.5 linear_model.py -r drqa_records/ -f feature_dir/
-py3.5 eval_model_nw.py -p newdata/drqa-val.txt -a CuratedTrec-test_val.txt -f feature_dir -m linear_model.mdl.train
+python prepare_data_nw.py -p nwdata/drqa-train.txt -a nwdata/CuratedTrec-test_train.txt -nm -r drqa_records/
+python linear_model.py -r drqa_records/ -m linear_model_drqa.mdl.train
+python eval_model_nw.py -p nwdata/drqa-val.txt -a nwdata/CuratedTrec-test_val.txt -m linear_model_drqa.mdl.train
+
+python prepare_data_nw.py -p nwdata/mnemonic-train.txt -a nwdata/CuratedTrec-test_train.txt -nm -r mnemonic_records/
+python linear_model.py -r mnemonic_records/ -m linear_model_mnemonic.mdl.train
+python eval_model_nw.py -p nwdata/mnemonic-val.txt -a nwdata/CuratedTrec-test_val.txt -m linear_model_mnemonic.mdl.train
+
+python prepare_data_nw.py -p nwdata/rnet-train.txt -a nwdata/CuratedTrec-test_train.txt -nm -r rnet_records/
+python linear_model.py -r rnet_records/ -m linear_model_rnet.mdl.train
+python eval_model_nw.py -p nwdata/rnet-val.txt -a nwdata/CuratedTrec-test_val.txt -m linear_model_rnet.mdl.train
