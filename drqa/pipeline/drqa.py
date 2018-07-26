@@ -72,7 +72,8 @@ class DrQA(object):
             max_loaders=5,
             num_workers=None,
             ranker=None,
-            et_threshold=None,
+            et_model=None,
+            et_threshold=None
     ):
         """Initialize the pipeline.
 
@@ -138,10 +139,9 @@ class DrQA(object):
         self.processes = ProcessPool(num_workers,
                                      initializer=init,
                                      initargs=(tok_class, tok_opts, fixed_candidates))
-        if et_threshold:
-            self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.5
+        if et_model:
+            self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.65
             logger.info('Initializing early stopping model...')
-            et_model = DEFAULTS['linear_model']
             self.et_model = EarlyStoppingModel.load(et_model)
             logger.info('early stopping model (et threshold: %s) loaded.' % self.et_threshold)
         else:
@@ -400,7 +400,11 @@ class DrQA(object):
                         'question': q_text,
                         'qlemma': q_tokens[0].lemmas(),
                         'document': para_text,
-                        'lemma': s_tokens[sidx].lemmas(),
+                        'document_char': s_tokens[sidx].chars(),
+                        'question_char': q_tokens[0].chars(),
+                        # 'lemma': s_tokens[sidx].lemmas(),
+                        # 'pos': s_tokens[sidx].pos(),
+                        # 'ner': s_tokens[sidx].entities(),
                         'doc_score': float(all_doc_scores[0][rel_didx])
                     })
                     para_lens.append(len(para_text))

@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import Dataset
+
 from drqa.tokenizers.tokenizer import Tokenizer
 
 logger = logging.getLogger(__name__)
@@ -211,9 +212,9 @@ class RecordDataset(Dataset):
 
         # az_norm = (record_data['a_zscore'] - Z_MEAN) / Z_STD
         # if record_data['a_zscore'] != 0:
-            # a_zscore_norm = torch.FloatTensor(list([az_norm]))  # 1
+        # a_zscore_norm = torch.FloatTensor(list([az_norm]))  # 1
         # else:
-            # a_zscore_norm = a_zscore
+        # a_zscore_norm = a_zscore
 
         corr_doc_score = torch.FloatTensor(list([record_data['corr_doc_score']]))  # 1
 

@@ -59,6 +59,8 @@ parser.add_argument('--predict-batch-size', type=int, default=1,
 parser.add_argument('--ranker', type=str, default='lucene')
 parser.add_argument('--et_threshold', type=float, default=None,
                     help='early stopping threshold')
+parser.add_argument('--et_model', type=str, default=None,
+                    help='early stopping model')
 parser.add_argument("-v", "--verbose", help="log more debug info", action="store_true")
 
 args = parser.parse_args()
@@ -96,6 +98,7 @@ DrQA = pipeline.DrQA(
     data_parallel=args.parallel,
     ranker=ranker,
     num_workers=args.num_workers,
+    et_model=args.et_model,
     et_threshold=args.et_threshold
 )
 
