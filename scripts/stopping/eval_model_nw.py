@@ -26,13 +26,10 @@ Z_MEAN = 3164
 ANS_MEAN = 100000
 ANS_STD = 1000000
 
-THRESHOLD = 0.55
-
-
 # 0.65 for Dr QA
 
 
-def batch_predict_test(data_line_, prediction_line_, model, match_fn_, stop_at=-1):
+def batch_predict_test(data_line_, prediction_line_, model, match_fn_, threshold, stop_at=-1):
     data = json.loads(data_line_)
     # question = data['question']
     # q_id = slugify(question)
@@ -143,7 +140,7 @@ def batch_predict_test(data_line_, prediction_line_, model, match_fn_, stop_at=-
                                                                                                          i, ans_score,
                                                                                                          repeats))
             #    if prob > 0.5:
-            if prob > THRESHOLD:
+            if prob > threshold:
                 if i + 1 >= correct_rank:
                     correct_count_ += 1
                     diff = i + 1 - correct_rank
@@ -198,6 +195,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--model_file', default=None, help='stopping model')
     parser.add_argument('-nm', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
     parser.add_argument('--stop_at', default=-1, type=int)
+    parser.add_argument('-t', '--threshold', default=0.65, type=float)
 
     args = parser.parse_args()
 
@@ -224,7 +222,7 @@ if __name__ == '__main__':
 
     for data_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
                                           open(prediction_file, encoding=ENCODING)):
-        param = (data_line, prediction_line, eval_model, match_func, args.stop_at)
+        param = (data_line, prediction_line, eval_model, match_func, args.threshold, args.stop_at)
         #  handle = async_pool.apply_async(batch_predict, param)
         handle = batch_predict_test(*param)
         result_handles.append(handle)
