@@ -96,7 +96,7 @@ def add_train_args(parser):
     save_load.add_argument('--expand-dictionary', type='bool', default=False,
                            help='Expand dictionary of pretrained model to ' +
                                 'include training/dev words of new data')
-    save_load.add_argument('--early-stop', type=int, default=10,
+    save_load.add_argument('--early-stop', type=int, default=20,
                            help='Checkpoints for early stop')
 
     # Data preprocessing
@@ -548,11 +548,11 @@ def main(args):
                 best_model_path = model_file
                 model.save(model_file)
                 stats['best_valid'] = result[args.valid_metric]
-                for f in kept_models:
-                    os.remove(f)
+                # for f in kept_models:
+                #     os.remove(f)
                 kept_models.clear()
             else:
-                model.save(model_file)
+                # model.save(model_file)
                 kept_models.append(model_file)
                 if len(kept_models) >= args.early_stop:
                     logger.info('Finished training due to %s not improved for %d epochs, best model is at: %s' %

@@ -6,19 +6,21 @@
 # LICENSE file in the root directory of this source tree.
 """Document Reader model"""
 
-import torch
-import torch.optim as optim
-import torch.nn.functional as F
-import numpy as np
-import logging
 import copy
+import logging
 import time
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+import torch.optim as optim
 from torch.autograd import Variable
+
 from .config import override_model_args
+from .data import Dictionary
+from .m_reader import MnemonicReader
 from .r_net import RNet
 from .rnn_reader import RnnDocReader
-from .m_reader import MnemonicReader
-from .data import Dictionary
 
 logger = logging.getLogger(__name__)
 
@@ -300,8 +302,8 @@ class DocReader(object):
         loss.backward()
 
         # Clip gradients
-        torch.nn.utils.clip_grad_norm_(self.network.parameters(),
-                                       self.args.grad_clipping)
+        torch.nn.utils.clip_grad_norm(self.network.parameters(),
+                                      self.args.grad_clipping)
 
         # Update parameters
         self.optimizer.step()
@@ -310,7 +312,7 @@ class DocReader(object):
         # Reset any partially fixed parameters (e.g. rare words)
         self.reset_parameters()
 
-        return loss.item(), ex[0].size(0)
+        return loss.data[0], ex[0].size(0)
 
     def reset_parameters(self):
         """Reset any partially fixed parameters to original states."""

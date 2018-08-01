@@ -84,9 +84,9 @@ def add_model_args(parser):
                        help='Whether to dropout the RNN output')
     optim.add_argument('--optimizer', type=str, default='adamax',
                        help='Optimizer: sgd, adamax, adadelta')
-    optim.add_argument('--learning-rate', type=float, default=1.0,
+    optim.add_argument('--learning-rate', type=float, default=0.001,
                        help='Learning rate for sgd, adadelta')
-    optim.add_argument('--grad-clipping', type=float, default=10,
+    optim.add_argument('--grad-clipping', type=float, default=20,
                        help='Gradient clipping')
     optim.add_argument('--weight-decay', type=float, default=0,
                        help='Weight decay factor')
@@ -100,7 +100,7 @@ def add_model_args(parser):
                        help='Keep word embeddings fixed (use pretrained)')
     optim.add_argument('--tune-partial', type=int, default=0,
                        help='Backprop through only the top N question words')
-    optim.add_argument('--rnn-padding', type='bool', default=False,
+    optim.add_argument('--rnn-padding', type='bool', default=True,
                        help='Explicitly account for padding in RNN encoding')
     optim.add_argument('--max-len', type=int, default=15,
                        help='The max span allowed during decoding')
