@@ -43,7 +43,7 @@ class RNet(nn.Module):
         self.char_rnn = layers.StackedBRNN(
             input_size=args.char_embedding_dim,
             hidden_size=args.char_hidden_size,
-            num_layers=2 if args.rnn_type == 'sru' else 1,
+            num_layers=1,
             dropout_rate=args.dropout_rnn,
             dropout_output=args.dropout_rnn_output,
             concat_layers=False,
@@ -78,11 +78,11 @@ class RNet(nn.Module):
         self.question_attn_rnn = layers.StackedBRNN(
             input_size=doc_hidden_size + question_hidden_size,
             hidden_size=args.hidden_size,
-            num_layers=2 if args.rnn_type == 'sru' else 1,
+            num_layers=1,
             dropout_rate=args.dropout_rnn,
             dropout_output=args.dropout_rnn_output,
             concat_layers=False,
-            rnn_type=self.RNN_TYPES[args.rnn_type],
+            # rnn_type=self.RNN_TYPES[args.rnn_type],
             padding=args.rnn_padding,
         )
 
@@ -94,11 +94,11 @@ class RNet(nn.Module):
         self.doc_self_attn_rnn = layers.StackedBRNN(
             input_size=question_attn_hidden_size + question_attn_hidden_size,
             hidden_size=args.hidden_size,
-            num_layers=2 if args.rnn_type == 'sru' else 1,
+            num_layers=1,
             dropout_rate=args.dropout_rnn,
             dropout_output=args.dropout_rnn_output,
             concat_layers=False,
-            rnn_type=self.RNN_TYPES[args.rnn_type],
+            # rnn_type=self.RNN_TYPES[args.rnn_type],
             padding=args.rnn_padding,
         )
 
@@ -107,11 +107,11 @@ class RNet(nn.Module):
         self.doc_self_attn_rnn2 = layers.StackedBRNN(
             input_size=doc_self_attn_hidden_size,
             hidden_size=args.hidden_size,
-            num_layers=2 if args.rnn_type == 'sru' else 1,
+            num_layers=1,
             dropout_rate=args.dropout_rnn,
             dropout_output=args.dropout_rnn_output,
             concat_layers=False,
-            rnn_type=self.RNN_TYPES[args.rnn_type],
+            # rnn_type=self.RNN_TYPES[args.rnn_type],
             padding=args.rnn_padding,
         )
 
