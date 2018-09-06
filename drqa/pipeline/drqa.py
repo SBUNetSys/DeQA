@@ -263,7 +263,7 @@ class DrQA(object):
                         examples.append({
                             'id': (qidx, rel_didx, sidx),
                             'question': q_text,
-                            'qlemma': q_tokens[qidx].lemmas(),
+                            # 'qlemma': q_tokens[qidx].lemmas(),
                             'document': para_text,
                             'document_char': s_tokens[sidx].chars(),
                             'question_char': q_tokens[qidx].chars(),
