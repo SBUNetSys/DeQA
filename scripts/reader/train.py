@@ -96,7 +96,7 @@ def add_train_args(parser):
     save_load.add_argument('--expand-dictionary', type='bool', default=False,
                            help='Expand dictionary of pretrained model to ' +
                                 'include training/dev words of new data')
-    save_load.add_argument('--early-stop', type=int, default=20,
+    save_load.add_argument('--early-stop', type=int, default=10,
                            help='Checkpoints for early stop')
 
     # Data preprocessing
