@@ -275,8 +275,9 @@ def regex_match_score(prediction, pattern):
             pattern,
             flags=re.IGNORECASE + re.UNICODE + re.MULTILINE
         )
-    except BaseException:
-        logger.warn('Regular expression failed to compile: %s' % pattern)
+    except BaseException as e:
+        logger.warning('Regular expression failed to compile: %s' % pattern)
+        logger.warning(e)
         return False
     return compiled.match(prediction) is not None
 
