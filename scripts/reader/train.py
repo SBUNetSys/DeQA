@@ -93,6 +93,8 @@ def add_train_args(parser):
                            help='Save model + optimizer state after each epoch')
     save_load.add_argument('--pretrained', type=str, default='',
                            help='Path to a pretrained model to warm-start with')
+    save_load.add_argument('--embedding-from-model', type=str, default='',
+                           help='Path to a pretrained model with embedding weights')
     save_load.add_argument('--expand-dictionary', type='bool', default=False,
                            help='Expand dictionary of pretrained model to ' +
                                 'include training/dev words of new data')
@@ -201,7 +203,13 @@ def init_from_scratch(args, train_exs, dev_exs):
     # Build a dictionary from the data questions + documents (train/dev splits)
     logger.info('-' * 100)
     logger.info('Build word dictionary')
-    word_dict = utils.build_word_dict(args, train_exs + dev_exs)
+    if args.embedding_from_model:
+        sp = torch.load(args.embedding_from_model, map_location=lambda storage, loc: storage)
+        word_dict = sp['word_dict']
+        embedding_weights = sp['state_dict']['embedding.weight']
+    else:
+        embedding_weights = None
+        word_dict = utils.build_word_dict(args, train_exs + dev_exs)
     logger.info('Num words = %d' % len(word_dict))
 
     # Build a char dictionary from the data questions + documents (train/dev splits)
@@ -213,8 +221,11 @@ def init_from_scratch(args, train_exs, dev_exs):
     model = DocReader(config.get_model_args(args), word_dict, char_dict, feature_dict)
 
     # Load pretrained embeddings for words in dictionary
-    if args.embedding_file:
-        model.load_embeddings(word_dict.tokens(), args.embedding_file)
+    if args.embedding_from_model:
+        model.load_emb_weights(embedding_weights)
+    else:
+        if args.embedding_file:
+            model.load_embeddings(word_dict.tokens(), args.embedding_file)
     if args.char_embedding_file:
         model.load_char_embeddings(char_dict.tokens(), args.char_embedding_file)
 

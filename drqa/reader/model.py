@@ -129,6 +129,10 @@ class DocReader(object):
         # Return added chars
         return to_add
 
+    def load_emb_weights(self, embeddings_weights):
+        logger.info('Loading pre-trained embeddings weights')
+        self.network.embedding.weight.data.copy_(embeddings_weights)
+
     def load_embeddings(self, words, embedding_file):
         """Load pretrained embeddings for a given list of words, if they exist.
 
