@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import ujson as json
+import json
 import os
 import sys
 from collections import OrderedDict
@@ -334,7 +334,7 @@ if __name__ == '__main__':
     classifier_parser.add_argument('-mf', '--model_file', default=None, help='stopping model')
     classifier_parser.add_argument('-rf', '--record_file', default=None, help='train records')
     classifier_parser.add_argument('-tr', '--test_record', type=str, help='record file for testing')
-    classifier_parser.add_argument('-st', '--stop_threshold', default=0.65, type=float)
+    classifier_parser.add_argument('-st', '--stop_threshold', default=0.5, type=float)
 
     eval_parser = subparsers.add_parser('eval', parents=[parent_parser], help='eval end to end accuracy')
 
@@ -346,8 +346,7 @@ if __name__ == '__main__':
     eval_parser.add_argument('-o', '--out_file', help='data set with labels, e.g. CuratedTrec-test.txt')
     eval_parser.add_argument('-mf', '--model_file', default=None, help='stopping model')
     eval_parser.add_argument('-nr', '--no_regex', action='store_true', help='default to use regex match')
-    eval_parser.add_argument('-sl', '--stop_location', default=-1, type=int)
-    eval_parser.add_argument('-st', '--stop_threshold', default=0.65, type=float)
+    eval_parser.add_argument('-st', '--stop_threshold', default=0.5, type=float)
 
     parent_args = parent_parser.parse_args()
     # print(parent_parser.parse_args())
