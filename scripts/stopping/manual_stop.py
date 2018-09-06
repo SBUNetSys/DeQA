@@ -36,7 +36,7 @@ if __name__ == '__main__':
         prediction_dir = os.path.dirname(prediction_file)
         out_dir = os.path.join(prediction_dir, 'fixed_stop')
         os.makedirs(out_dir, exist_ok=True)
-        prediction_file_base= os.path.splitext(os.path.basename(prediction_file))[0]
+        prediction_file_base = os.path.splitext(os.path.basename(prediction_file))[0]
         out_file = os.path.join(out_dir, prediction_file_base + '.stop' + str(args.stop_location) + '.txt')
 
         with open(out_file, 'w', encoding=ENCODING) as sf:
