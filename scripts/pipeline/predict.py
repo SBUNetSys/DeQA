@@ -15,7 +15,7 @@ import time
 
 import torch
 
-from drqa import pipeline, retriever
+from drqa import pipeline, retriever, DATA_DIR
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -26,11 +26,8 @@ logger.addHandler(console)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('dataset', type=str)
-parser.add_argument('--out-dir', type=str, default=None,
-                    help="Directory to write prediction file")
-parser.add_argument('--out-suffix', type=str, default=None,
-                    help=("Directory to write prediction file to "
-                          "(<dataset>-<model>.predictions.txt)"))
+parser.add_argument('--out-file', type=str, default=None,
+                    help="path to write prediction file")
 parser.add_argument('--reader-model', type=str, default=None,
                     help="Path to trained Document Reader model")
 parser.add_argument('--normalize', action='store_true', help="Use normalized answer score")
@@ -115,9 +112,10 @@ for line in open(args.dataset):
 
 model_name = os.path.splitext(os.path.basename(args.reader_model or 'default'))[0]
 data_name = os.path.splitext(os.path.basename(args.dataset))[0]
-out_dir = args.out_dir or os.path.dirname(args.dataset)
+
+outfile = args.out_file or os.path.join(DATA_DIR, '{}-{}.predictions.txt'.format(data_name, model_name))
+out_dir = os.path.dirname(outfile)
 os.makedirs(out_dir, exist_ok=True)
-outfile = os.path.join(out_dir, args.out_suffix or '{}-{}.predictions.txt'.format(data_name, model_name))
 
 logger.info('Writing results to %s' % outfile)
 with open(outfile, 'w') as f:
