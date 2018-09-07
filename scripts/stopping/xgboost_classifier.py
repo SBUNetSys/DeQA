@@ -251,8 +251,7 @@ def eval_end2end(args):
                 # past10 = 1 if i >= 10 else 0
                 past20 = 1 if i >= 20 else 0
                 x = [max_zscore, ans_score, doc_score, repeats, past20]
-                feature_x = np.reshape(x, (1, -1))
-                feature_mat = xgboost.DMatrix(feature_x)
+                feature_mat = xgboost.DMatrix(x)
                 stop_prob = bst.predict(feature_mat)
 
                 if stop_prob > args.stop_threshold:

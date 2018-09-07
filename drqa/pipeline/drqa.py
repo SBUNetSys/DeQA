@@ -16,6 +16,7 @@ from multiprocessing.util import Finalize
 import numpy as np
 import regex
 import torch
+import xgboost
 
 from . import DEFAULTS
 from .StoppingModel import EarlyStoppingModel
@@ -32,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 PROCESS_TOK = None
 PROCESS_CANDS = None
-DOC_MEAN = 8.5142
-DOC_STD = 2.8324
+# DOC_MEAN = 8.5142
+# DOC_STD = 2.8324
 
 
 def init(tokenizer_class, tokenizer_opts, candidates=None):
@@ -140,9 +141,10 @@ class DrQA(object):
                                      initializer=init,
                                      initargs=(tok_class, tok_opts, fixed_candidates))
         if et_model:
-            self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.65
+            self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.5
             logger.info('Initializing early stopping model...')
-            self.et_model = EarlyStoppingModel.load(et_model)
+            self.et_model = xgboost.Booster()
+            self.et_model.load_model(et_model)
             logger.info('early stopping model (et threshold: %s) loaded.' % self.et_threshold)
         else:
             self.et_threshold = None
@@ -488,16 +490,11 @@ class DrQA(object):
                 repeats += 1
             all_spans.append(span)
 
-            repeats_2 = 1 if repeats == 2 else 0
-            repeats_3 = 1 if repeats == 3 else 0
-            repeats_4 = 1 if repeats == 4 else 0
-            repeats_5 = 1 if repeats >= 5 else 0
+            # repeats_2 = 1 if repeats == 2 else 0
+            # repeats_3 = 1 if repeats == 3 else 0
+            # repeats_4 = 1 if repeats == 4 else 0
+            # repeats_5 = 1 if repeats >= 5 else 0
             past20 = 1 if i + p_count >= 20 else 0
-            repeats_2 = torch.FloatTensor([repeats_2])
-            repeats_3 = torch.FloatTensor([repeats_3])
-            repeats_4 = torch.FloatTensor([repeats_4])
-            repeats_5 = torch.FloatTensor([repeats_5])
-            past20 = torch.FloatTensor([past20])
 
             if len(all_a_scores) <= 1:  # don't use a_z_score feature at the beginning
                 a_z_score = 0
@@ -507,19 +504,10 @@ class DrQA(object):
             all_a_z_scores.append(a_z_score)
 
             max_z_score = max(all_a_z_scores)
-            if max_z_score > 0:
-                log_max_z_score = math.log(max_z_score)
-            else:
-                log_max_z_score = 0
 
-            corr_doc_score = (doc_score - DOC_MEAN) / DOC_STD
-            corr_doc_score = torch.FloatTensor([corr_doc_score])
-
-            log_max_z_score = torch.FloatTensor([log_max_z_score])
-
-            et_input = torch.cat([corr_doc_score, log_max_z_score, repeats_2, repeats_3, repeats_4, repeats_5, past20])
-
-            et_prob = self.et_model.predict(et_input, prob=True)
+            x = [max_z_score, a_score, doc_score, repeats, past20]
+            feature_mat = xgboost.DMatrix(x)
+            et_prob = self.et_model.predict(feature_mat)
             if et_prob > self.et_threshold:
                 should_stop = True
                 break
