@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import pandas as pd
 import sys
 from collections import OrderedDict
 from multiprocessing import Pool as ProcessPool
@@ -92,11 +93,11 @@ def process_record(data_line_, prediction_line_, neg_gap_, match_fn):
         # record['repeats_3'] = repeats_3
         # record['repeats_4'] = repeats_4
         # record['repeats_5'] = repeats_5
-        past5 = 1 if i >= 5 else 0
-        past10 = 1 if i >= 10 else 0
+        # past5 = 1 if i >= 5 else 0
+        # past10 = 1 if i >= 10 else 0
         past20 = 1 if i >= 20 else 0
-        record['past5'] = past5
-        record['past10'] = past10
+        # record['past5'] = past5
+        # record['past10'] = past10
         record['past20'] = past20
         match = metric_max_over_ground_truths(match_fn, normalize(span), answer)
         if match:
@@ -106,9 +107,9 @@ def process_record(data_line_, prediction_line_, neg_gap_, match_fn):
             # if stop_count_ >= 3:
             #     return records_, stop_count_
         else:
-            # if i % neg_gap_ == 0:
-            record['stop'] = 0
-            records_.append(record)
+            if i % neg_gap_ == 0:
+                record['stop'] = 0
+                records_.append(record)
     return records_, stop_count_
 
 
@@ -148,19 +149,16 @@ def gen_records(args):
             stop_count += stop
             print('processed %d records, stop: %d' % (total_count, stop_count))
             sys.stdout.flush()
-    with open(args.record_file, 'w', encoding=ENCODING) as f:
-        f.write(json.dumps(all_records, indent=2))
+
+    df = pd.DataFrame(all_records)
+    df.to_csv(args.record_file)
 
 
 def get_data(record_file):
-    with open(record_file, encoding=ENCODING) as f:
-        data = json.load(f)
-
-    d = [list(da.values()) for da in data]
-    data = np.asarray(d)
-    x = data[:, :-1]
-    label = data[:, -1]
-    return x, label.astype(int)
+    df = pd.read_csv(record_file)
+    x = df.loc[:, 'max_zscore':'past20']
+    y = df.loc[:, 'stop']
+    return x, y
 
 
 def train_classifier(args):
@@ -187,6 +185,9 @@ def eval_end2end(args):
     out_file = args.out_file
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
     prediction_file = args.prediction_file
+    answer_file = args.answer_file
+    match_fn = exact_match_score if args.no_regex else regex_match_score
+
     data_dir = os.path.dirname(prediction_file)
 
     model_file = args.model_file or os.path.join(data_dir, '{}.xgb'.format(args.classifier))
@@ -194,9 +195,13 @@ def eval_end2end(args):
     bst.load_model(model_file)
 
     stop_count = 0
+    stop_correct = 0
     processed = 0
     with open(out_file, 'w', encoding=ENCODING) as of:
-        for prediction_line in open(prediction_file, encoding=ENCODING):
+        for answer_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
+                                              open(prediction_file, encoding=ENCODING)):
+            answer_data = json.loads(answer_line)
+            answer = [normalize(a) for a in answer_data['answer']]
 
             out_predictions = []
 
@@ -242,22 +247,24 @@ def eval_end2end(args):
                 # repeats_3 = 1 if repeats == 3 else 0
                 # repeats_4 = 1 if repeats == 4 else 0
                 # repeats_5 = 1 if repeats >= 5 else 0
-                past5 = 1 if i >= 5 else 0
-                past10 = 1 if i >= 10 else 0
+                # past5 = 1 if i >= 5 else 0
+                # past10 = 1 if i >= 10 else 0
                 past20 = 1 if i >= 20 else 0
-                x = [max_zscore, ans_score, doc_score, repeats, past5, past10, past20]
+                x = [max_zscore, ans_score, doc_score, repeats, past20]
                 feature_x = np.reshape(x, (1, -1))
                 feature_mat = xgboost.DMatrix(feature_x)
                 stop_prob = bst.predict(feature_mat)
 
                 if stop_prob > args.stop_threshold:
+                    if metric_max_over_ground_truths(match_fn, normalize(span), answer):
+                        stop_correct += 1
                     stop_count += 1
                     print(stop_prob, 'stopped at:', i + 1, stop_count, processed)
                     break
 
             processed += 1
             of.write(json.dumps(out_predictions) + '\n')
-            print('processed', stop_count, processed)
+            print('processed', stop_correct, stop_count, processed)
 
 
 if __name__ == '__main__':
@@ -271,7 +278,7 @@ if __name__ == '__main__':
     gen_parser.add_argument('-a', '--answer_file', help='data set with labels, e.g. CuratedTrec-test.txt')
     gen_parser.add_argument('-nr', '--no_regex', action='store_true', help='default to use regex match')
     gen_parser.add_argument('-nm', '--no_multiprocess', action='store_true', help='default to use multiprocessing')
-    gen_parser.add_argument('-ns', '--negative_scale', type=int, default=10, help='scale factor for negative samples')
+    gen_parser.add_argument('-ns', '--negative_scale', type=int, default=1, help='scale factor for negative samples')
 
     classifier_parser = subparsers.add_parser('train', parents=[parent_parser], help='train classifier')
 
@@ -286,6 +293,7 @@ if __name__ == '__main__':
 
     eval_parser.add_argument('-c', '--classifier', default='logistic', choices=['linear', 'logistic'],
                              help='classifier for xgboost')
+    eval_parser.add_argument('-a', '--answer_file', help='data set with labels, e.g. CuratedTrec-test.txt')
     eval_parser.add_argument('-p', '--prediction_file', help='prediction file, e.g. CuratedTrec-test.preds.txt')
     eval_parser.add_argument('-o', '--out_file', help='data set with labels, e.g. CuratedTrec-test.txt')
     eval_parser.add_argument('-mf', '--model_file', default=None, help='stopping model')
