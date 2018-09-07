@@ -82,25 +82,29 @@ def process_record(data_line_, prediction_line_, neg_gap_, match_fn):
         record['max_zscore'] = max_zscore
         record['ans_score'] = ans_score
         record['doc_score'] = doc_score
-        repeats_2 = 1 if repeats == 2 else 0
-        repeats_3 = 1 if repeats == 3 else 0
-        repeats_4 = 1 if repeats == 4 else 0
-        repeats_5 = 1 if repeats >= 5 else 0
-        past20 = 1 if i >= 20 else 0
+        record['repeats'] = repeats
+        # repeats_2 = 1 if repeats == 2 else 0
+        # repeats_3 = 1 if repeats == 3 else 0
+        # repeats_4 = 1 if repeats == 4 else 0
+        # repeats_5 = 1 if repeats >= 5 else 0
         # record['i'] = i
         # record['repeats_2'] = repeats_2
         # record['repeats_3'] = repeats_3
         # record['repeats_4'] = repeats_4
         # record['repeats_5'] = repeats_5
+        past5 = 1 if i >= 5 else 0
+        past10 = 1 if i >= 10 else 0
+        past20 = 1 if i >= 20 else 0
+        record['past5'] = past5
+        record['past10'] = past10
         record['past20'] = past20
-        record['repeats'] = repeats
         match = metric_max_over_ground_truths(match_fn, normalize(span), answer)
         if match:
             record['stop'] = 1
             stop_count_ += 1
             records_.append(record)
-            if stop_count_ >= 3:
-                return records_, stop_count_
+            # if stop_count_ >= 3:
+            #     return records_, stop_count_
         else:
             # if i % neg_gap_ == 0:
             record['stop'] = 0
@@ -175,8 +179,8 @@ def train_classifier(args):
     model_dir = os.path.dirname(model_file)
     os.makedirs(model_dir, exist_ok=True)
     bst.save_model(model_file)
-    xgboost.plot_importance(bst)
-    xgboost.plot_tree(bst)
+    # xgboost.plot_importance(bst)
+    # xgboost.plot_tree(bst)
 
 
 def eval_end2end(args):
@@ -234,12 +238,14 @@ def eval_end2end(args):
                 all_a_zscores.append(a_zscore)
                 max_zscore = max(all_a_zscores)
 
-                repeats_2 = 1 if repeats == 2 else 0
-                repeats_3 = 1 if repeats == 3 else 0
-                repeats_4 = 1 if repeats == 4 else 0
-                repeats_5 = 1 if repeats >= 5 else 0
+                # repeats_2 = 1 if repeats == 2 else 0
+                # repeats_3 = 1 if repeats == 3 else 0
+                # repeats_4 = 1 if repeats == 4 else 0
+                # repeats_5 = 1 if repeats >= 5 else 0
+                past5 = 1 if i >= 5 else 0
+                past10 = 1 if i >= 10 else 0
                 past20 = 1 if i >= 20 else 0
-                x = [max_zscore, ans_score, doc_score, past20, repeats]
+                x = [max_zscore, ans_score, doc_score, repeats, past5, past10, past20]
                 feature_x = np.reshape(x, (1, -1))
                 feature_mat = xgboost.DMatrix(feature_x)
                 stop_prob = bst.predict(feature_mat)
