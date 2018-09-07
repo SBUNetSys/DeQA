@@ -7,3 +7,4 @@ prettytable
 scipy
 nltk
 pexpect
+xgboost
