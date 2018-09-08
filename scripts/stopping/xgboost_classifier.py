@@ -99,13 +99,20 @@ def process_record(data_line_, prediction_line_, neg_gap_, match_fn):
         # record['past5'] = past5
         # record['past10'] = past10
         record['past20'] = past20
-        match = metric_max_over_ground_truths(match_fn, normalize(span), answer)
-        if match:
+        if i + 1 == correct_rank:
+
             record['stop'] = 1
             stop_count_ += 1
             records_.append(record)
-            # if stop_count_ >= 3:
-            #     return records_, stop_count_
+
+        elif i + 1 > correct_rank:
+            if i % neg_gap_ == 0:
+                record['stop'] = 1
+                stop_count_ += 1
+                records_.append(record)
+            if i + 1 - correct_rank > 20:
+                return records_, stop_count_
+
         else:
             if i % neg_gap_ == 0:
                 record['stop'] = 0
@@ -167,11 +174,15 @@ def train_classifier(args):
     x_eval, label_eval = get_data(args.test_record)
     data_train = xgboost.DMatrix(x_train, label=label_train)
     data_test = xgboost.DMatrix(x_eval, label=label_eval)
-    params = {'max_depth': 6, 'eta': 0.3, 'silent': 0, 'objective': 'binary:logistic',
+    sum_pos = sum(label_train)
+    sum_neg = len(label_train) - sum_pos
+    params = {'max_depth': 6, 'eta': 0.3, 'silent': 0,
+              'objective': 'binary:logistic', 'scale_pos_weight': sum_neg / sum_pos,
+              'max_delta_step': 3,
               'eval_metric': ['error', 'auc', 'map']}
 
     watchlist = [(data_test, 'eval'), (data_train, 'train')]
-    num_round = 20
+    num_round = 10
     bst = xgboost.train(params, data_train, num_round, watchlist)
     model_file = args.model_file or os.path.join(data_dir, '{}.xgb'.format(args.classifier))
     model_dir = os.path.dirname(model_file)
@@ -199,7 +210,7 @@ def eval_end2end(args):
     processed = 0
     with open(out_file, 'w', encoding=ENCODING) as of:
         for answer_line, prediction_line in zip(open(answer_file, encoding=ENCODING),
-                                              open(prediction_file, encoding=ENCODING)):
+                                                open(prediction_file, encoding=ENCODING)):
             answer_data = json.loads(answer_line)
             answer = [normalize(a) for a in answer_data['answer']]
 
