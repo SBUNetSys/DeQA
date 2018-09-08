@@ -16,10 +16,9 @@ from multiprocessing.util import Finalize
 import numpy as np
 import regex
 import torch
-import xgboost
+import treelite.runtime
 
 from . import DEFAULTS
-from .StoppingModel import EarlyStoppingModel
 from .. import reader
 from .. import tokenizers
 from ..reader.data import ReaderDataset, SortedBatchSampler
@@ -143,8 +142,7 @@ class DrQA(object):
         if et_model:
             self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.5
             logger.info('Initializing early stopping model...')
-            self.et_model = xgboost.Booster()
-            self.et_model.load_model(et_model)
+            self.et_model = treelite.runtime.Predictor(et_model, verbose=True)
             logger.info('early stopping model (et threshold: %s) loaded.' % self.et_threshold)
         else:
             self.et_threshold = None
@@ -505,9 +503,8 @@ class DrQA(object):
 
             max_z_score = max(all_a_z_scores)
 
-            x = [max_z_score, a_score, doc_score, repeats, past20]
-            feature_mat = xgboost.DMatrix(x)
-            et_prob = self.et_model.predict(feature_mat)
+            x = np.array([max_z_score, a_score, doc_score, repeats, past20])
+            et_prob = self.et_model.predict_instance(x)
             if et_prob > self.et_threshold:
                 should_stop = True
                 break
