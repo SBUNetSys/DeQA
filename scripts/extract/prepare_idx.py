@@ -111,7 +111,7 @@ if __name__ == '__main__':
             data_dict[k]['text'] = document
 
     doc_base, doc_ext = os.path.splitext(doc_file)
-    out_file = args.out_file or doc_base + '.idx' + doc_ext
+    out_file = args.out_file or doc_base + '.idx.json'
 
     with open(out_file, 'w', encoding='utf-8') as f:
         f.write(json.dumps(data_dict, sort_keys=True, indent=None if args.no_indent else 2))
