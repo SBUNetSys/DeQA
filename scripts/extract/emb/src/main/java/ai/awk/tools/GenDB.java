@@ -7,32 +7,62 @@ import org.jetbrains.bio.npy.NpyArray;
 import org.jetbrains.bio.npy.NpzFile;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.List;
+
+import static java.util.stream.Collectors.toList;
 
 public class BuildEmb {
     private static void printUsage() {
-        String usage = "gen [embedding file in numpy npz format] [output file] \n"
-                + "get [padldb database file] [query key]\n";
+        String usage = "gen emb [embedding file in numpy npz format] [output file]\n"
+                + "gen idx [doc folder] [output file]\n"
+                + "query [padldb database file] [query key]\n";
         System.err.println(usage);
         System.exit(-1);
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         if (args.length < 1) {
             printUsage();
         } else {
             String func = args[0];
             if (func.toLowerCase().startsWith("gen")) {
-                writeEmbDB(args);
-            } else if (func.toLowerCase().startsWith("get")) {
+                if (args[1].equalsIgnoreCase("emb")) {
+                    writeEmbDB(args);
+                } else if (args[1].equalsIgnoreCase("idx")) {
+                    writeIdxDB(args);
+                }
+            } else if (func.toLowerCase().startsWith("query")) {
                 queryEmbDB(args);
             } else {
                 System.err.println("invalid args:" + func + "!");
                 printUsage();
             }
         }
+    }
+
+    private static void writeIdxDB(String[] args) throws IOException {
+        String folderPath = args[2];
+        String outFilePath = args[3];
+        List<Path> docFiles = Files.walk(Paths.get(folderPath))
+                .filter(s -> s.toString().endsWith(".json"))
+                .map(Path::getFileName)
+                .sorted()
+                .collect(toList());
+        System.out.println(docFiles);
+        for (Path doc : docFiles) {
+            String key = FilenameUtils.getBaseName(doc.toFile());
+            int[] value = getVaule(doc);
+
+        }
+    }
+
+    private static String getKey(Path doc) {
+        return null;
     }
 
     private static void queryEmbDB(String[] args) {
@@ -45,8 +75,8 @@ public class BuildEmb {
     }
 
     private static void writeEmbDB(String[] args) {
-        String embFilePath = args[1];
-        String outFilePath = args[2];
+        String embFilePath = args[2];
+        String outFilePath = args[3];
 
         Path npFile = Paths.get(embFilePath);
         NpzFile.Reader npzReader = NpzFile.read(npFile);

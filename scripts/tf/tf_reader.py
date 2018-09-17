@@ -34,11 +34,11 @@ class MyLSTMCell(BasicLSTMCell):
             raise ValueError('Expected inputs.shape[-1] to be known, saw shape: %s'
                              % inputs_shape)
         self._kernel = self.add_variable('kernel',
-                                         shape=None,
-                                         initializer=self.weight_initializer)
+                                         shape=self.weight_initializer.shape,
+                                         initializer=tf.constant_initializer(self.weight_initializer))
         self._bias = self.add_variable('bias',
-                                       shape=None,
-                                       initializer=self.bias_initializer)
+                                       shape=self.bias_initializer.shape,
+                                       initializer=tf.constant_initializer(self.bias_initializer))
         self.built = True
 
     def call(self, inputs, state):
@@ -89,6 +89,34 @@ def length(sequence):
     return pad_len
 
 
+def ztg(data, k):
+    n = data.get_shape().as_list()[0]
+    mask_u = tf.greater_equal(tf.tile(tf.reshape(tf.range(n), [n, 1]), [1, n]),
+                              tf.tile(tf.reshape(tf.range(1, n + 1), [1, n]), [n, 1]))
+    mask_l = tf.greater_equal(tf.tile(tf.reshape(tf.range(n), [n, 1]), [1, n]),
+                              tf.tile(tf.reshape(tf.range(-k + 1, n - k + 1), [1, n]), [n, 1]))
+    tri = tf.where(mask_u, tf.zeros(data.get_shape(), dtype=data.dtype), data)  # tri_u
+    # print(tri)
+    tri2 = tf.where(mask_l, tri, tf.zeros(data.get_shape(), dtype=data.dtype))  # tri_l
+    return tri2
+
+
+def decode(answer_scores):
+    answers = []
+    for scores in answer_scores:
+        score_s, score_e = tf.split(scores, 2)
+        scores = tf.matmul(tf.expand_dims(score_s, 1), tf.expand_dims(score_e, 0))
+        # Zero out negative length and over-length span scores
+        scores = ztg(scores, 14)
+        max_score_idx = tf.argmax(tf.reshape(scores, [-1]))
+        dim = scores.get_shape().as_list()[0]
+        s_idx = tf.cast(tf.div(max_score_idx, dim), dtype=tf.float32)
+        e_idx = tf.cast(tf.mod(max_score_idx, dim), dtype=tf.float32)
+        s = tf.reduce_max(scores)
+        answers.append([s_idx, e_idx, s])
+    return answers
+
+
 def stack_bi_rnn(input_data, hidden_size, num_layers, weights, scope, mask=None):
     rnn_scope = 'q_rnn' if scope.startswith('q') else 'p_rnn'
     with tf.variable_scope(rnn_scope):
@@ -116,9 +144,9 @@ def stack_bi_rnn(input_data, hidden_size, num_layers, weights, scope, mask=None)
             bw_bias = np.add(bw_bias_input, bw_bias_hidden)
 
             with tf.variable_scope('layer_{}'.format(str(k))):
-                fw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
+                fw_cell = MyLSTMCell(num_units=hidden_size, name='basic_lstm_cell',
                                      weight_initializer=fw_weights, bias_initializer=fw_bias)
-                bw_cell = MyLSTMCell(num_units=hidden_size, name='lstm',
+                bw_cell = MyLSTMCell(num_units=hidden_size, name='basic_lstm_cell',
                                      weight_initializer=bw_weights, bias_initializer=bw_bias)
 
                 output, _ = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell, last_output,
@@ -218,12 +246,12 @@ class RnnReader(object):
 
         return out
 
-    def network(self, x1_emb, x1_f, x1_mask, x2_emb):
+    def network(self, x1_emb, x1_mask, x2_emb):
         with tf.variable_scope('q_seq_attn'):
             x2_weighted_emb = self.seq_attn_match(x1_emb, x2_emb, self.emb_shape[1])
 
         with tf.variable_scope('p_rnn_input'):
-            doc_rnn_input_list = [x1_emb, x2_weighted_emb, x1_f]
+            doc_rnn_input_list = [x1_emb, x2_weighted_emb]
             doc_rnn_input = tf.concat(doc_rnn_input_list, axis=2)
 
         # self.np_rnn(x2_emb.numpy())
@@ -301,44 +329,55 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--embedding_file', type=str, default='data/emb.npz')
     parser.add_argument('-a', '--args', type=str, default='data/args.npy')
     parser.add_argument('-t', '--test_ex', type=str, default='data/ex.npz')
+    parser.add_argument('-egr', '--eager', action='store_true')
 
     args = parser.parse_args()
-    reader = RnnReader(args.args, args.weights_file)
+
     ex_input = np.load(args.test_ex)
     ex_inputs = [ex_input[k] for k in ex_input.keys()[:-1]]
     emb = np.load(args.embedding_file)['emb']
     ex_inputs[0] = np.array([emb[i] for i in ex_inputs[0]])
     ex_inputs[3] = np.array([emb[i] for i in ex_inputs[3]])
 
-    input_names = ['para/emb', 'para/feature', 'para/mask', 'q_emb']
+    inputs = [ex_inputs[0], ex_inputs[2], ex_inputs[3]]
+    if args.eager:
+        tf.enable_eager_execution()
+        reader = RnnReader(args.args, args.weights_file)
+        results = reader.network(*inputs)
+        print(results)
+        answer = decode(results)
+        print(answer)
+    else:
+        reader = RnnReader(args.args, args.weights_file)
+        input_names = ['para/emb', 'para/mask', 'q_emb']
 
-    placeholders = [tf.placeholder(tf.as_dtype(k.dtype), shape=[None, None, *k.shape[2:]], name=n)
-                    for n, k in zip(input_names, ex_inputs)]
-    final_answers = reader.network(*placeholders)
-    sess = reader.sess
-    np_weights = dict()
-    for var in tf.global_variables():
-        sess.run(var.initializer)
-        # print(sess.run(var))
-        var_name = var.name[:-2]
-        print(var_name, var.shape)
-        np_weights[var_name] = sess.run(var)
-    np.savez_compressed('data/lstm_reader', **{k: v for k, v in np_weights.items()})
-    sess.run(tf.global_variables_initializer())
-    # print(sess.run(tf.report_uninitialized_variables()))
+        placeholders = [tf.placeholder(tf.as_dtype(k.dtype), shape=[None, None, *k.shape[2:]], name=n)
+                        for n, k in zip(input_names, inputs)]
+        final_answers = reader.network(*placeholders)
+        sess = reader.sess
+        np_weights = dict()
+        for var in tf.global_variables():
+            sess.run(var.initializer)
+            # print(sess.run(var))
+            var_name = var.name[:-2]
+            print(var_name, var.shape)
+            np_weights[var_name] = sess.run(var)
+        np.savez_compressed('data/drqa_w', **{k: v for k, v in np_weights.items()})
+        sess.run(tf.global_variables_initializer())
+        # print(sess.run(tf.report_uninitialized_variables()))
 
-    results = sess.run(final_answers, feed_dict={k: v for k, v in zip(placeholders, ex_inputs)})
-    print(results)
-    graph = tf.get_default_graph()
-    graph_def = graph.as_graph_def()
-    output_graph_def = graph_util.convert_variables_to_constants(
-        sess,  # The session is used to retrieve the weights
-        graph_def,  # The graph_def is used to retrieve the nodes
-        output_node_names=['answer/scores']  # The output node names are used to select the useful nodes
-    )
-    with tf.gfile.GFile('data/tf_reader.pb', 'wb') as gf:
-        gf.write(output_graph_def.SerializeToString())
-    with tf.gfile.FastGFile('data/tf_reader.pb.txt', 'w') as gf:
-        gf.write(str(remove_weights(graph_def)))
+        results = sess.run(final_answers, feed_dict={k: v for k, v in zip(placeholders, inputs)})
+        print(results)
+        graph = tf.get_default_graph()
+        graph_def = graph.as_graph_def()
+        output_graph_def = graph_util.convert_variables_to_constants(
+            sess,  # The session is used to retrieve the weights
+            graph_def,  # The graph_def is used to retrieve the nodes
+            output_node_names=['answer/scores']  # The output node names are used to select the useful nodes
+        )
+        with tf.gfile.GFile('data/drqa.pb', 'wb') as gf:
+            gf.write(output_graph_def.SerializeToString())
+        with tf.gfile.FastGFile('data/drqa.pb.txt', 'w') as gf:
+            gf.write(str(remove_weights(graph_def)))
     # saver = tf.train.Saver()
     # saver.save(sess, 'data/tf_reader.ckpt')

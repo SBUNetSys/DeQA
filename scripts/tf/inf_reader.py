@@ -8,7 +8,7 @@ np.set_printoptions(suppress=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--frozen_model', type=str, default='data/tf_reader.pb')
+    parser.add_argument('-m', '--frozen_model', type=str, default='data/drqa.pb')
     parser.add_argument('-t', '--test_ex', type=str, default='data/ex.npz')
     parser.add_argument('-e', '--embedding_file', type=str, default='data/emb.npz')
 
@@ -31,12 +31,13 @@ if __name__ == '__main__':
     # weight = session.run(graph.get_operation_by_name('p_rnn/layer_0/bi_rnn/fw/lstm/kernel').outputs[0])
     # print(weight)
     begin_time = time.time()
-    input_names = ['para/emb', 'para/feature', 'para/mask', 'q_emb']
+    input_names = ['para/emb', 'para/mask', 'q_emb']
 
     placeholders = [graph.get_operation_by_name(name).outputs[0] for name in input_names]
 
     output = graph.get_operation_by_name('answer/scores').outputs[0]
 
-    scores = session.run(output, feed_dict={k: v for k, v in zip(placeholders, ex_inputs)})
+    scores = session.run(output, feed_dict={k: v for k, v in zip(placeholders,
+                                                                 [ex_inputs[0], ex_inputs[2], ex_inputs[3]])})
     print(scores)
     end_time = time.time()
