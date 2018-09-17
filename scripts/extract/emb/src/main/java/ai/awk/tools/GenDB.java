@@ -1,8 +1,10 @@
 package ai.awk.tools;
 
+import com.google.gson.Gson;
 import com.linkedin.paldb.api.PalDB;
 import com.linkedin.paldb.api.StoreReader;
 import com.linkedin.paldb.api.StoreWriter;
+import org.apache.commons.io.FilenameUtils;
 import org.jetbrains.bio.npy.NpyArray;
 import org.jetbrains.bio.npy.NpzFile;
 
@@ -16,11 +18,12 @@ import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 
-public class BuildEmb {
+public class GenDB {
     private static void printUsage() {
         String usage = "gen emb [embedding file in numpy npz format] [output file]\n"
                 + "gen idx [doc folder] [output file]\n"
-                + "query [padldb database file] [query key]\n";
+                + "query emb [padldb database file] [query key]\n"
+                + "query idx [padldb database file] [query key]\n";
         System.err.println(usage);
         System.exit(-1);
     }
@@ -35,9 +38,17 @@ public class BuildEmb {
                     writeEmbDB(args);
                 } else if (args[1].equalsIgnoreCase("idx")) {
                     writeIdxDB(args);
+                } else {
+                    printUsage();
                 }
             } else if (func.toLowerCase().startsWith("query")) {
-                queryEmbDB(args);
+                if (args[1].equalsIgnoreCase("emb")) {
+                    queryEmbDB(args);
+                } else if (args[1].equalsIgnoreCase("idx")) {
+                    queryDocDB(args);
+                } else {
+                    printUsage();
+                }
             } else {
                 System.err.println("invalid args:" + func + "!");
                 printUsage();
@@ -45,32 +56,60 @@ public class BuildEmb {
         }
     }
 
+    private static void queryDocDB(String[] args) {
+        String docDBPath = args[2];
+        String query = args[3];
+        StoreReader reader = PalDB.createReader(new File(docDBPath));
+        if (query.startsWith("c_")) {
+            int[][] vector = reader.get(query);
+            System.out.println("\n\033[36mResults for \033[1m" + query + "\033[0m: \033[1m");
+            System.out.println(Arrays.deepToString(vector));
+        } else {
+            int[] vector = reader.get(query);
+            System.out.println("\n\033[36mResults for \033[1m" + query + "\033[0m: \033[1m");
+            System.out.println(Arrays.toString(vector));
+        }
+
+    }
+
     private static void writeIdxDB(String[] args) throws IOException {
         String folderPath = args[2];
         String outFilePath = args[3];
         List<Path> docFiles = Files.walk(Paths.get(folderPath))
                 .filter(s -> s.toString().endsWith(".json"))
-                .map(Path::getFileName)
                 .sorted()
                 .collect(toList());
         System.out.println(docFiles);
+        Gson gson = new Gson();
+        File dbFile = new File(outFilePath);
+        StoreWriter writer = PalDB.createWriter(dbFile);
         for (Path doc : docFiles) {
-            String key = FilenameUtils.getBaseName(doc.toFile());
-            int[] value = getVaule(doc);
-
+            System.out.println(doc);
+            String key = FilenameUtils.getBaseName(doc.toString());
+            String content = new String(Files.readAllBytes(doc));
+            if (key.startsWith("c_")) {
+                int[][] value = gson.fromJson(content, int[][].class);
+                writer.put(key, value);
+//                System.out.println(Arrays.deepToString(value));
+//                System.out.println("put " + key);
+            } else {
+                int[] value = gson.fromJson(content, int[].class);
+                writer.put(key, value);
+//                System.out.println("put " + key);
+//                System.out.println(Arrays.toString(value));
+            }
         }
+        writer.close();
+        System.out.println("finished, doc database is at: \033[36m" + dbFile.toString());
     }
 
-    private static String getKey(Path doc) {
-        return null;
-    }
 
     private static void queryEmbDB(String[] args) {
-        String embDbPath = args[1];
-        String query = args[2];
+        String embDbPath = args[2];
+        String query = args[3];
         StoreReader reader = PalDB.createReader(new File(embDbPath));
         float[] vector = reader.get(Integer.parseInt(query));
-        System.out.println("\n\033[36mResults: \033[0m\033[1m");
+        System.out.println("\n\033[36mResults for \033[1m" + query + "\033[0m: \033[1m");
         System.out.println(Arrays.toString(vector));
     }
 

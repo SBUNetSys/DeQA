@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'ai.awk.tools'
+version '0.1.0'
+
+sourceCompatibility = 1.8
+mainClassName = 'ai.awk.tools.GenDB'
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    compile 'com.google.code.gson:gson:2.8.5'
+    compile 'commons-io:commons-io:2.6'
+    compile 'org.jetbrains.bio:npy:0.3.3'
+    compile 'com.linkedin.paldb:paldb:1.1.0'
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
