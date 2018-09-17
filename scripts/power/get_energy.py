@@ -23,11 +23,11 @@ if __name__ == "__main__":
             voltage = float(row[2])
             if voltage > 0:
                 times.append(time_stamp)
-                powers.append(voltage * current)
+                powers.append(current)
 
     duration = times[-1] - times[0]
     energy = np.trapz(np.asarray(powers, dtype=float), x=np.asarray(times, dtype=float))
     print('samples:', len(powers))
     print('duration: {:.3f} s'.format(duration))
-    print('energy: {:.3f} mJ'.format(energy))
+    print('energy: {:.3f} mAh'.format(energy / 3600))
     print('power: {:.3f} mW'.format(energy / duration))
