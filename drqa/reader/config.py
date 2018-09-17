@@ -61,7 +61,7 @@ def add_model_args(parser):
                         help='The way of computing the question representation')
     detail.add_argument('--use-qemb', type='bool', default=True,
                         help='Whether to use weighted question embeddings')
-    detail.add_argument('--use-exact-match', type='bool', default=True,
+    detail.add_argument('--use-exact-match', type='bool', default=False,
                         help='Whether to use in_question_* features')
     detail.add_argument('--use-pos', type='bool', default=False,
                         help='Whether to use pos features')
@@ -69,7 +69,7 @@ def add_model_args(parser):
                         help='Whether to use ner features')
     detail.add_argument('--use-lemma', type='bool', default=False,
                         help='Whether to use lemma features')
-    detail.add_argument('--use-tf', type='bool', default=True,
+    detail.add_argument('--use-tf', type='bool', default=False,
                         help='Whether to use term frequency features')
     detail.add_argument('--hop', type=int, default=1,
                         help='The number of hops for both aligner and the answer pointer in m-reader')
