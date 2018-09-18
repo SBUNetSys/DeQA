@@ -78,7 +78,6 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tok2idx_file', type=str)
     parser.add_argument('-c', '--char2idx_file', type=str)
     parser.add_argument('-o', '--out_file', type=str)
-    parser.add_argument('-g', '--gen_query', action='store_true')
     parser.add_argument('-pl', '--pad_char_len', type=int, default=-1)
     parser.add_argument('-ni', '--no_indent', action='store_true')
     parser.add_argument('-f', '--doc_folder', type=str)
@@ -111,21 +110,21 @@ if __name__ == '__main__':
             with open(out_file, 'w', encoding='utf-8') as f:
                 f.write(json.dumps(doc_char_idx, sort_keys=True, indent=None if args.no_indent else 2))
     else:
+        question_data = []
         for k, document in tqdm(doc_data.items()):
             doc_idx, doc_char_idx = get_doc_indices(document, tok2idx_dict, char2idx_dict)
             if args.pad_char_len > 0:
                 doc_char_idx = pad_array(doc_char_idx, args.pad_char_len)
-            data_dict[k] = {
-                'd_idx': doc_idx,
-                'dc_idx': doc_char_idx
-            }
-            if args.gen_query:
-                data_dict[k]['query'] = gen_query(document)
-                data_dict[k]['text'] = document
+            question_data.append({
+                'query': gen_query(document),
+                'text': document,
+                'w_idx': doc_idx,
+                'c_idx': doc_char_idx
+            })
 
         doc_base, doc_ext = os.path.splitext(doc_file)
         out_file = args.out_file or doc_base + '.idx.json'
 
         with open(out_file, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(data_dict, sort_keys=True, indent=None if args.no_indent else 2))
+            f.write(json.dumps(question_data, indent=None if args.no_indent else 2))
     print('all done.')
