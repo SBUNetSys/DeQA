@@ -45,7 +45,7 @@ class Tokens(object):
             uncased: lower cases characters
         """
         if uncased:
-            return [t[self.CHAR].lower() for t in self.data]
+            return [[c.lower() for c in t[self.CHAR]] for t in self.data]
         else:
             return [t[self.CHAR] for t in self.data]
 

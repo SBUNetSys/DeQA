@@ -114,7 +114,7 @@ class CoreNLPTokenizer(Tokenizer):
             converted_words = self._convert(tokens[i]['word'])
             data.append((
                 converted_words,
-                converted_words[0] if len(converted_words) > 0 else '',
+                [c for c in converted_words],
                 text[start_ws: end_ws],
                 (tokens[i]['characterOffsetBegin'],
                  tokens[i]['characterOffsetEnd']),

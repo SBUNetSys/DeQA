@@ -189,6 +189,36 @@ def set_defaults(args):
 # ------------------------------------------------------------------------------
 # Initalization from scratch.
 # ------------------------------------------------------------------------------
+class EMA(object):
+
+    def __init__(self, mu):
+        self.mu = mu
+        self.shadow = {}
+        self.original = {}
+
+    def register(self, name, val):
+        self.shadow[name] = val.clone()
+
+    def __call__(self, model, num_updates):
+        decay = min(self.mu, (1.0 + num_updates) / (10.0 + num_updates))
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                assert name in self.shadow
+                new_average = (1.0 - decay) * param.data + decay * self.shadow[name]
+                self.shadow[name] = new_average.clone()
+
+    def assign(self, model):
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                assert name in self.shadow
+                self.original[name] = param.data.clone()
+                param.data = self.shadow[name]
+
+    def resume(self, model):
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                assert name in self.shadow
+                param.data = self.original[name]
 
 
 def init_from_scratch(args, train_exs, dev_exs):
@@ -218,7 +248,21 @@ def init_from_scratch(args, train_exs, dev_exs):
     char_dict = utils.build_char_dict(args, train_exs + dev_exs)
     logger.info('Num chars = %d' % len(char_dict))
     # Initialize model
-    model = DocReader(config.get_model_args(args), word_dict, char_dict, feature_dict)
+    ema = EMA(args.decay)
+    model = DocReader(config.get_model_args(args), word_dict, char_dict, feature_dict, ema=ema)
+
+    # Use the GPU?
+    if args.cuda:
+        model.cuda()
+
+    # Use multiple GPUs?
+    if args.parallel:
+        model.parallelize()
+
+    if args.use_ema:
+        for name, param in model.network.named_parameters():
+            if param.requires_grad:
+                ema.register(name, param.data)
 
     # Load pretrained embeddings for words in dictionary
     if args.embedding_from_model:

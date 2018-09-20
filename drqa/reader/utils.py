@@ -31,6 +31,16 @@ def load_data(args, filename, skip_no_answer=False):
     # Load JSON lines
     with open(filename) as f:
         examples = [json.loads(line) for line in f]
+    for ex in examples:
+        ex['question_char'] = [[c for c in qw] for qw in ex['question']]
+        ex['document_char'] = [[c for c in dw] for dw in ex['document']]
+    #
+    #     if args.uncased_question:
+    #         ex['question'] = [w.lower() for w in ex['question']]
+    #         ex['question_char'] = [[c.lower() for c in w] for w in ex['question_char']]
+    #     if args.uncased_doc:
+    #         ex['document'] = [w.lower() for w in ex['document']]
+    #         ex['document_char'] = [[c.lower() for c in w] for w in ex['document_char']]
 
     # Make case insensitive?
     if args.uncased_question or args.uncased_doc:
@@ -140,11 +150,12 @@ def load_chars(args, examples):
     """Iterate and index all the chars in examples (documents + questions)."""
 
     def _insert(iterable):
-        for c in iterable:
-            c = Dictionary.normalize(c)
-            if valid_chars and c not in valid_chars:
-                continue
-            chars.add(c)
+        for cs in iterable:
+            for c in cs:
+                c = Dictionary.normalize(c)
+                if valid_chars and c not in valid_chars:
+                    continue
+                chars.add(c)
 
     if args.restrict_vocab and args.char_embedding_file:
         logger.info('Restricting to chars in %s' % args.char_embedding_file)
@@ -155,8 +166,8 @@ def load_chars(args, examples):
 
     chars = set()
     for ex in examples:
-        _insert(ex['question_char'])
-        _insert(ex['document_char'])
+        _insert(ex['question'])
+        _insert(ex['document'])
     return chars
 
 

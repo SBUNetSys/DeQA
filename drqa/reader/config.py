@@ -15,14 +15,15 @@ logger = logging.getLogger(__name__)
 MODEL_ARCHITECTURE = {
     'model_type', 'embedding_dim', 'char_embedding_dim', 'hidden_size', 'char_hidden_size',
     'doc_layers', 'question_layers', 'rnn_type', 'concat_rnn_layers', 'question_merge',
-    'use_qemb', 'use_exact_match', 'use_pos', 'use_ner', 'use_lemma', 'use_tf', 'hop'
+    'use_qemb', 'use_exact_match', 'use_pos', 'use_ner', 'use_lemma', 'use_tf', 'hop',
+    'num_head', 'char_limit', 'use_ema'
 }
 
 # Index of arguments concerning the model optimizer/training
 MODEL_OPTIMIZER = {
     'fix_embeddings', 'optimizer', 'learning_rate', 'momentum', 'weight_decay',
-    'rho', 'eps', 'max_len', 'grad_clipping', 'tune_partial',
-    'rnn_padding', 'dropout_rnn', 'dropout_rnn_output', 'dropout_emb'
+    'rho', 'eps', 'max_len', 'grad_clipping', 'tune_partial', 'dropout',
+    'rnn_padding', 'dropout_rnn', 'dropout_rnn_output', 'dropout_emb', 'decay'
 }
 
 
@@ -36,7 +37,7 @@ def add_model_args(parser):
     # Model architecture
     model = parser.add_argument_group('Reader Model Architecture')
     model.add_argument('--model-type', type=str, default='mnemonic',
-                       choices=['drqa', 'rnet', 'mnemonic'],
+                       choices=['drqa', 'mnemonic', 'rnet', 'qanet'],
                        help='Model architecture type: drqa, rnet, mnemonic')
     model.add_argument('--embedding-dim', type=int, default=300,
                        help='Embedding size if embedding_file is not given')
@@ -52,6 +53,11 @@ def add_model_args(parser):
                        help='Number of encoding layers for question')
     model.add_argument('--rnn-type', type=str, default='lstm',
                        help='RNN type: LSTM, GRU, or RNN')
+
+    model.add_argument('--num-head', type=int, default=8,
+                       help='number of attention heads')
+    model.add_argument('--char-limit', type=int, default=16,
+                       help='number of attention heads')
 
     # Model specific details
     detail = parser.add_argument_group('Reader Model Details')
@@ -73,9 +79,13 @@ def add_model_args(parser):
                         help='Whether to use term frequency features')
     detail.add_argument('--hop', type=int, default=1,
                         help='The number of hops for both aligner and the answer pointer in m-reader')
-
+    detail.add_argument('--use-ema',
+                        default=False, action='store_true',
+                        help='whether use exponential moving average')
     # Optimization details
     optim = parser.add_argument_group('Reader Optimization')
+    optim.add_argument('--dropout', type=float, default=0.1,
+                       help='QANet dropout')
     optim.add_argument('--dropout-emb', type=float, default=0.3,
                        help='Dropout rate for word embeddings')
     optim.add_argument('--dropout-rnn', type=float, default=0.3,
@@ -88,8 +98,10 @@ def add_model_args(parser):
                        help='Learning rate for sgd, adadelta')
     optim.add_argument('--grad-clipping', type=float, default=20,
                        help='Gradient clipping')
-    optim.add_argument('--weight-decay', type=float, default=0,
+    optim.add_argument('--weight-decay', type=float, default=3e-7,
                        help='Weight decay factor')
+    optim.add_argument('--decay', default=0.9999, type=float,
+                       help='exponential moving average decay')
     optim.add_argument('--momentum', type=float, default=0,
                        help='Momentum factor')
     optim.add_argument('--rho', type=float, default=0.95,

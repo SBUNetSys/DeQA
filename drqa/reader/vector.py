@@ -15,6 +15,41 @@ import torch
 logger = logging.getLogger(__name__)
 
 
+def pad_char(x, max_len=None):
+    """
+    pad input 2d array (list of list), if max_len is given, may truncate inner 1d array:
+    e.g.
+    x = [[3, 46, 73, 43, 46],
+         [19, 65, 64],
+         [2, 82, 55, 4],
+         [18, 82, 76, 18, 82, 28, 82, 27, 2, 82, 36],
+         [2, 46, 82],
+         [25, 65, 39],
+         [55, 2]]
+    pad_array(x, 5) will be:
+        [[3, 46, 73, 43, 46],
+         [19, 65, 64, 0, 0],
+         [2, 82, 55, 4, 0],
+         [18, 82, 76, 18, 82],
+         [2, 46, 82, 0, 0],
+         [25, 65, 39, 0, 0],
+         [55, 2, 0, 0, 0]]
+    while pad_array(x) will be:
+        [[3, 46, 73, 43, 46, 0, 0, 0, 0, 0, 0],
+         [19, 65, 64, 0, 0, 0, 0, 0, 0, 0, 0],
+         [2, 82, 55, 4, 0, 0, 0, 0, 0, 0, 0],
+         [18, 82, 76, 18, 82, 28, 82, 27, 2, 82, 36],
+         [2, 46, 82, 0, 0, 0, 0, 0, 0, 0, 0],
+         [25, 65, 39, 0, 0, 0, 0, 0, 0, 0, 0],
+         [55, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
+    :param x: input 2d array
+    :param max_len: truncate len
+    :return: padded list in rectangular format
+    """
+    max_length = max(len(row) for row in x)
+    return [row[:max_len] + ['<NULL>'] * ((max_len if max_len else max_length) - len(row)) for row in x]
+
+
 def vectorize(ex, model, single_answer=False):
     """Torchify a single example."""
     t1 = time.time()
@@ -26,9 +61,18 @@ def vectorize(ex, model, single_answer=False):
 
     # Index words
     document = torch.LongTensor([word_dict[w] for w in ex['document']])
-    document_char = torch.LongTensor([char_dict[w] for w in ex['document_char']])
     question = torch.LongTensor([word_dict[w] for w in ex['question']])
-    question_char = torch.LongTensor([char_dict[w] for w in ex['question_char']])
+    # qc = [[c for c in qw] for qw in ex['question']]
+    # dc = [[c for c in dw] for dw in ex['document']]
+    qc = pad_char(ex['question_char'], args.char_limit)
+    dc = pad_char(ex['document_char'], args.char_limit)
+    # if args.model_type == 'qanet':
+    question_char = torch.LongTensor([[char_dict[c] for c in w] for w in qc])
+    document_char = torch.LongTensor([[char_dict[c] for c in w] for w in dc])
+    # else:
+    #     # FIXME for rnet and mnemonic reader
+    #     question_char = torch.LongTensor([char_dict[w[0]] for w in ex['question_char']])
+    #     document_char = torch.LongTensor([char_dict[w[0]] for w in ex['document_char']])
 
     # Create extra features vector
     if len(feature_dict) > 0:
@@ -93,7 +137,7 @@ def batchify(batch):
     NUM_INPUTS = 5
     NUM_TARGETS = 2
     NUM_EXTRA = 1
-    t1 = time.time()
+    # t1 = time.time()
 
     ids = [ex[-1] for ex in batch]
     docs = [ex[0] for ex in batch]
@@ -104,8 +148,9 @@ def batchify(batch):
 
     # Batch documents and features
     max_length = max([d.size(0) for d in docs])
+    char_len = len(doc_chars[0][0])
     x1 = torch.LongTensor(len(docs), max_length).zero_()
-    x1_c = torch.LongTensor(len(docs), max_length).zero_()
+    x1_c = torch.LongTensor(len(docs), max_length, char_len).zero_()
     x1_mask = torch.ByteTensor(len(docs), max_length).fill_(1)
     if features[0] is None:
         x1_f = None
@@ -122,15 +167,19 @@ def batchify(batch):
     # Batch questions
     max_length = max([q.size(0) for q in questions])
     x2 = torch.LongTensor(len(questions), max_length).zero_()
-    x2_c = torch.LongTensor(len(questions), max_length).zero_()
+    x2_c = torch.LongTensor(len(questions), max_length, char_len).zero_()
     x2_mask = torch.ByteTensor(len(questions), max_length).fill_(1)
     for i, q in enumerate(questions):
         x2[i, :q.size(0)].copy_(q)
         x2_mask[i, :q.size(0)].fill_(0)
     for i, c in enumerate(question_chars):
+        # logger.info('c0: %s' % c.size(0))
+        # logger.info('c1: %s' % c.size(1))
         x2_c[i, :c.size(0)].copy_(c)
+        # logger.info('x2_ci: %s' % x2_c[i])
+    # logger.info('x2_c: %s' % x2_c)
 
-    t2 = time.time()
+    # t2 = time.time()
     # logger.debug('batchify [time]: %.4f s' % (t2 - t1))
     # Maybe return without targets
     if len(batch[0]) == NUM_INPUTS + NUM_EXTRA:
@@ -146,5 +195,7 @@ def batchify(batch):
             y_e = [ex[NUM_INPUTS + 1] for ex in batch]
     else:
         raise RuntimeError('Incorrect number of inputs per example.')
+    # logger.info('y_s: %s' % y_s)
+    # logger.info('y_e: %s' % y_e)
 
     return x1, x1_c, x1_f, x1_mask, x2, x2_c, x2_mask, y_s, y_e, ids

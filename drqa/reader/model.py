@@ -21,6 +21,7 @@ from .data import Dictionary
 from .m_reader import MnemonicReader
 from .r_net import RNet
 from .rnn_reader import RnnDocReader
+from .qanet import QANet
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class DocReader(object):
     # --------------------------------------------------------------------------
 
     def __init__(self, args, word_dict, char_dict, feature_dict,
-                 state_dict=None, normalize=True):
+                 state_dict=None, normalize=True, ema=None):
         # Book-keeping.
         self.args = args
         self.word_dict = word_dict
@@ -47,15 +48,17 @@ class DocReader(object):
         self.updates = 0
         self.use_cuda = False
         self.parallel = False
-
+        self.ema = ema
         # Building network. If normalize if false, scores are not normalized
         # 0-1 per paragraph (no softmax).
         if args.model_type == 'drqa':
             self.network = RnnDocReader(args, normalize)
-        elif args.model_type == 'rnet':
-            self.network = RNet(args, normalize)
         elif args.model_type == 'mnemonic':
             self.network = MnemonicReader(args, normalize)
+        elif args.model_type == 'rnet':
+            self.network = RNet(args, normalize)
+        elif args.model_type == 'qanet':
+            self.network = QANet(args, normalize)
         else:
             raise RuntimeError('Unsupported model: %s' % args.model_type)
 
@@ -312,6 +315,9 @@ class DocReader(object):
         # Update parameters
         self.optimizer.step()
         self.updates += 1
+
+        if self.args.use_ema and self.ema is not None:
+            self.ema(self.network, self.updates)
 
         # Reset any partially fixed parameters (e.g. rare words)
         self.reset_parameters()
