@@ -16,7 +16,7 @@ MODEL_ARCHITECTURE = {
     'model_type', 'embedding_dim', 'char_embedding_dim', 'hidden_size', 'char_hidden_size',
     'doc_layers', 'question_layers', 'rnn_type', 'concat_rnn_layers', 'question_merge',
     'use_qemb', 'use_exact_match', 'use_pos', 'use_ner', 'use_lemma', 'use_tf', 'hop',
-    'num_head', 'char_limit', 'use_ema'
+    'num_head', 'char_limit'
 }
 
 # Index of arguments concerning the model optimizer/training
@@ -79,9 +79,7 @@ def add_model_args(parser):
                         help='Whether to use term frequency features')
     detail.add_argument('--hop', type=int, default=1,
                         help='The number of hops for both aligner and the answer pointer in m-reader')
-    detail.add_argument('--use-ema',
-                        default=False, action='store_true',
-                        help='whether use exponential moving average')
+
     # Optimization details
     optim = parser.add_argument_group('Reader Optimization')
     optim.add_argument('--dropout', type=float, default=0.1,

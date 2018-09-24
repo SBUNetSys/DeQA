@@ -387,17 +387,17 @@ class QANet(nn.Module):
         q_enc_emb = self.emb_enc(q_emb, q_mask, 1, 1)
         cq_sim_x = self.cq_att(c_enc_emb, q_enc_emb, c_mask, q_mask)
         m_0 = self.cq_resizer(cq_sim_x)
-        m_0 = F.dropout(m_0, p=self.dropout, training=self.training)
-        for i, blk in enumerate(self.model_enc_blks):
-            m_0 = blk(m_0, c_mask, i * (2 + 2) + 1, 7)
-        m_1 = m_0
-        for i, blk in enumerate(self.model_enc_blks):
-            m_0 = blk(m_0, c_mask, i * (2 + 2) + 1, 7)
-        m_2 = m_0
-        m_0 = F.dropout(m_0, p=self.dropout, training=self.training)
-        for i, blk in enumerate(self.model_enc_blks):
-            m_0 = blk(m_0, c_mask, i * (2 + 2) + 1, 7)
-        m_3 = m_0
-        start_scores, end_scores = self.out(m_1, m_2, m_3, c_mask)
+        # m_0 = F.dropout(m_0, p=self.dropout, training=self.training)
+        enc = [m_0]
+        for i in range(3):
+            if i % 2 == 0:  # dropout every 2 blocks
+                enc[i] = F.dropout(enc[i], p=self.dropout, training=self.training)
+
+            blk_outputs = [enc[i]]
+            for j, blk in enumerate(self.model_enc_blks):
+                blk_in = blk_outputs[-1]
+                blk_outputs.append(blk(blk_in, c_mask, j * (2 + 2) + 1, 7))
+            enc.append(blk_outputs[-1])
+        start_scores, end_scores = self.out(enc[1], enc[2], enc[3], c_mask)
 
         return start_scores, end_scores

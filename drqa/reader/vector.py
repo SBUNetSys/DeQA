@@ -15,41 +15,6 @@ import torch
 logger = logging.getLogger(__name__)
 
 
-def pad_char(x, max_len=None):
-    """
-    pad input 2d array (list of list), if max_len is given, may truncate inner 1d array:
-    e.g.
-    x = [[3, 46, 73, 43, 46],
-         [19, 65, 64],
-         [2, 82, 55, 4],
-         [18, 82, 76, 18, 82, 28, 82, 27, 2, 82, 36],
-         [2, 46, 82],
-         [25, 65, 39],
-         [55, 2]]
-    pad_array(x, 5) will be:
-        [[3, 46, 73, 43, 46],
-         [19, 65, 64, 0, 0],
-         [2, 82, 55, 4, 0],
-         [18, 82, 76, 18, 82],
-         [2, 46, 82, 0, 0],
-         [25, 65, 39, 0, 0],
-         [55, 2, 0, 0, 0]]
-    while pad_array(x) will be:
-        [[3, 46, 73, 43, 46, 0, 0, 0, 0, 0, 0],
-         [19, 65, 64, 0, 0, 0, 0, 0, 0, 0, 0],
-         [2, 82, 55, 4, 0, 0, 0, 0, 0, 0, 0],
-         [18, 82, 76, 18, 82, 28, 82, 27, 2, 82, 36],
-         [2, 46, 82, 0, 0, 0, 0, 0, 0, 0, 0],
-         [25, 65, 39, 0, 0, 0, 0, 0, 0, 0, 0],
-         [55, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
-    :param x: input 2d array
-    :param max_len: truncate len
-    :return: padded list in rectangular format
-    """
-    max_length = max(len(row) for row in x)
-    return [row[:max_len] + ['<NULL>'] * ((max_len if max_len else max_length) - len(row)) for row in x]
-
-
 def vectorize(ex, model, single_answer=False):
     """Torchify a single example."""
     t1 = time.time()
@@ -62,13 +27,16 @@ def vectorize(ex, model, single_answer=False):
     # Index words
     document = torch.LongTensor([word_dict[w] for w in ex['document']])
     question = torch.LongTensor([word_dict[w] for w in ex['question']])
-    # qc = [[c for c in qw] for qw in ex['question']]
-    # dc = [[c for c in dw] for dw in ex['document']]
-    qc = pad_char(ex['question_char'], args.char_limit)
-    dc = pad_char(ex['document_char'], args.char_limit)
+    qc = [[char_dict[c] for c in qw[:args.char_limit]] + [0] *
+          (0 if len(qw) > args.char_limit else args.char_limit - len(qw))
+          for qw in ex['question']]
+    dc = [[char_dict[c] for c in dw[:args.char_limit]] + [0] *
+          (0 if len(dw) > args.char_limit else args.char_limit - len(dw))
+          for dw in ex['document']]
+
     # if args.model_type == 'qanet':
-    question_char = torch.LongTensor([[char_dict[c] for c in w] for w in qc])
-    document_char = torch.LongTensor([[char_dict[c] for c in w] for w in dc])
+    question_char = torch.LongTensor(qc)
+    document_char = torch.LongTensor(dc)
     # else:
     #     # FIXME for rnet and mnemonic reader
     #     question_char = torch.LongTensor([char_dict[w[0]] for w in ex['question_char']])

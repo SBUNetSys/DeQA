@@ -60,7 +60,9 @@ def add_train_args(parser):
                          help='Batch size for training')
     runtime.add_argument('--test-batch-size', type=int, default=64,
                          help='Batch size during validation/testing')
-
+    runtime.add_argument('--use-ema',
+                         default=False, action='store_true',
+                         help='whether use exponential moving average')
     # Files
     files = parser.add_argument_group('Filesystem')
     files.add_argument('--model-dir', type=str, default=MODEL_DIR,
@@ -98,7 +100,7 @@ def add_train_args(parser):
     save_load.add_argument('--expand-dictionary', type='bool', default=False,
                            help='Expand dictionary of pretrained model to ' +
                                 'include training/dev words of new data')
-    save_load.add_argument('--early-stop', type=int, default=10,
+    save_load.add_argument('--early-stop', type=int, default=5,
                            help='Checkpoints for early stop')
 
     # Data preprocessing
@@ -248,21 +250,7 @@ def init_from_scratch(args, train_exs, dev_exs):
     char_dict = utils.build_char_dict(args, train_exs + dev_exs)
     logger.info('Num chars = %d' % len(char_dict))
     # Initialize model
-    ema = EMA(args.decay)
-    model = DocReader(config.get_model_args(args), word_dict, char_dict, feature_dict, ema=ema)
-
-    # Use the GPU?
-    if args.cuda:
-        model.cuda()
-
-    # Use multiple GPUs?
-    if args.parallel:
-        model.parallelize()
-
-    if args.use_ema:
-        for name, param in model.network.named_parameters():
-            if param.requires_grad:
-                ema.register(name, param.data)
+    model = DocReader(config.get_model_args(args), word_dict, char_dict, feature_dict)
 
     # Load pretrained embeddings for words in dictionary
     if args.embedding_from_model:
@@ -321,6 +309,8 @@ def validate_unofficial(args, data_loader, model, global_stats, mode):
     start_acc = utils.AverageMeter()
     end_acc = utils.AverageMeter()
     exact_match = utils.AverageMeter()
+    if model.ema:
+        model.ema.assign(model.network)
 
     # Make predictions
     examples = 0
@@ -345,7 +335,8 @@ def validate_unofficial(args, data_loader, model, global_stats, mode):
                 'end = %.2f | exact = %.2f | examples = %d | ' %
                 (end_acc.avg, exact_match.avg, examples) +
                 'valid time = %.2f (s)' % eval_time.time())
-
+    if model.ema:
+        model.ema.resume(model.network)
     return {'exact_match': exact_match.avg}
 
 
@@ -515,6 +506,13 @@ def main(args):
     # Use multiple GPUs?
     if args.parallel:
         model.parallelize()
+
+    if args.use_ema:
+        ema = EMA(args.decay)
+        model.ema = ema
+        for name, param in model.network.named_parameters():
+            if param.requires_grad:
+                ema.register(name, param.data)
 
     # --------------------------------------------------------------------------
     # DATA ITERATORS

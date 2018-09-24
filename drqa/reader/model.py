@@ -316,7 +316,7 @@ class DocReader(object):
         self.optimizer.step()
         self.updates += 1
 
-        if self.args.use_ema and self.ema is not None:
+        if self.ema:
             self.ema(self.network, self.updates)
 
         # Reset any partially fixed parameters (e.g. rare words)
@@ -500,6 +500,8 @@ class DocReader(object):
             logger.warning(str(e) + 'WARN: Saving failed... continuing anyway.')
 
     def checkpoint(self, filename, epoch):
+        if self.ema:
+            self.ema.assign(self.network)
         params = {
             'state_dict': self.network.state_dict(),
             'word_dict': self.word_dict,
@@ -509,6 +511,7 @@ class DocReader(object):
             'epoch': epoch,
             'optimizer': self.optimizer.state_dict(),
         }
+
         try:
             torch.save(params, filename)
         except BaseException as e:

@@ -31,9 +31,9 @@ def load_data(args, filename, skip_no_answer=False):
     # Load JSON lines
     with open(filename) as f:
         examples = [json.loads(line) for line in f]
-    for ex in examples:
-        ex['question_char'] = [[c for c in qw] for qw in ex['question']]
-        ex['document_char'] = [[c for c in dw] for dw in ex['document']]
+    # for ex in examples:
+    #     ex['question_char'] = [[c for c in qw] for qw in ex['question']]
+    #     ex['document_char'] = [[c for c in dw] for dw in ex['document']]
     #
     #     if args.uncased_question:
     #         ex['question'] = [w.lower() for w in ex['question']]
