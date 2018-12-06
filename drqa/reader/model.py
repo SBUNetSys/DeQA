@@ -43,6 +43,7 @@ class DocReader(object):
         self.char_dict = char_dict
         self.args.vocab_size = len(word_dict)
         self.args.char_size = len(char_dict)
+        self.args.char_limit = 16
         self.feature_dict = feature_dict
         self.args.num_features = len(feature_dict)
         self.updates = 0
