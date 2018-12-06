@@ -7,7 +7,7 @@ group 'ai.awk.tools'
 version '0.1.0'
 
 sourceCompatibility = 1.8
-mainClassName = 'ai.awk.tools.GenDB'
+mainClassName = 'ai.awk.tools.GenDBS'
 
 repositories {
     mavenCentral()
@@ -19,5 +19,6 @@ dependencies {
     compile 'commons-io:commons-io:2.6'
     compile 'org.jetbrains.bio:npy:0.3.3'
     compile 'com.linkedin.paldb:paldb:1.1.0'
+    compile 'com.spotify.sparkey:sparkey:2.3.1'
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
