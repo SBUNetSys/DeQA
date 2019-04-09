@@ -367,7 +367,7 @@ class DocReader(object):
         self.network.eval()
         # Transfer to GPU
         if self.use_cuda:
-            inputs = [e if e is None else Variable(e.cuda(async=True)) for e in ex[:7]]
+            inputs = [e if e is None else Variable(e.cuda()) for e in ex[:7]]
         else:
             inputs = [e if e is None else Variable(e) for e in ex[:7]]
         t2 = time.time()

@@ -30,11 +30,12 @@ def get_class(name):
     if name == 'sql':
         return SqliteRanker
     if name == 'lucene':
-        return LuceneRanker
+        return LuceneSearcher
     raise RuntimeError('Invalid retriever class: %s' % name)
 
 
 from .tfidf_doc_ranker import TfidfDocRanker
 from .galago_ranker import GalagoRanker
 from .sqlite_ranker import SqliteRanker
-from .lucene_ranker import LuceneRanker
+# from .lucene_ranker import LuceneRanker
+from .lucene_searcher import LuceneSearcher
