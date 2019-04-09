@@ -16,7 +16,6 @@ from multiprocessing.util import Finalize
 import numpy as np
 import regex
 import torch
-import treelite.runtime
 
 from . import DEFAULTS
 from .. import reader
@@ -32,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 PROCESS_TOK = None
 PROCESS_CANDS = None
+
+
 # DOC_MEAN = 8.5142
 # DOC_STD = 2.8324
 
@@ -60,20 +61,20 @@ class DrQA(object):
     GROUP_LENGTH = 0
 
     def __init__(
-            self,
-            reader_model=None,
-            normalize=False,
-            embedding_file=None,
-            tokenizer=None,
-            fixed_candidates=None,
-            batch_size=128,
-            cuda=True,
-            data_parallel=False,
-            max_loaders=5,
-            num_workers=None,
-            ranker=None,
-            et_model=None,
-            et_threshold=None
+        self,
+        reader_model=None,
+        normalize=False,
+        embedding_file=None,
+        tokenizer=None,
+        fixed_candidates=None,
+        batch_size=128,
+        cuda=True,
+        data_parallel=False,
+        max_loaders=5,
+        num_workers=None,
+        ranker=None,
+        et_model=None,
+        et_threshold=None
     ):
         """Initialize the pipeline.
 
@@ -142,6 +143,7 @@ class DrQA(object):
         if et_model:
             self.et_threshold = et_threshold if 0 < et_threshold < 1 else 0.5
             logger.info('Initializing early stopping model...')
+            import treelite.runtime
             self.et_model = treelite.runtime.Predictor(et_model, verbose=True)
             logger.info('early stopping model (et threshold: %s) loaded.' % self.et_threshold)
         else:

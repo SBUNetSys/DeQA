@@ -291,9 +291,9 @@ class DocReader(object):
 
         # Transfer to GPU
         if self.use_cuda:
-            inputs = [e if e is None else Variable(e.cuda(async=True)) for e in ex[:-3]]
-            target_s = Variable(ex[-3].cuda(async=True))
-            target_e = Variable(ex[-2].cuda(async=True))
+            inputs = [e if e is None else Variable(e.cuda()) for e in ex[:-3]]
+            target_s = Variable(ex[-3].cuda())
+            target_e = Variable(ex[-2].cuda())
         else:
             inputs = [e if e is None else Variable(e) for e in ex[:-3]]
             target_s = Variable(ex[-3])
